@@ -10,14 +10,54 @@
 
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #050816;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      border: none;
+      display: block;
+      background: #050816;
+    }
+  </style>
+</head>
+
+<body>
+
+  <iframe
+    src="https://dullystory.blogspot.com/"
+    title="Story Za Dully"
+    allow="fullscreen">
+  </iframe>
 
   <script>
-    window.location.replace(
-      "https://dullystory.blogspot.com/"
-    );
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("./service-worker.js")
+          .then(function (registration) {
+            console.log("PWA Service Worker ready");
+          })
+          .catch(function (error) {
+            console.error("Service Worker:", error);
+          });
+      });
+    }
   </script>
-</head>
-<body>
-  <p>Inafungua Story Za Dully...</p>
+
 </body>
 </html>
