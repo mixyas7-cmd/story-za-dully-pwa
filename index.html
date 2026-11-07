@@ -9,8 +9,7 @@
   <title>Story Za Dully</title>
 
   <link rel="manifest" href="./manifest.json">
-  <link rel="icon" type="image/png" sizes="512x512"
-        href="./icons/icon-512.png">
+  <link rel="icon" href="./icons/icon-512.png">
   <link rel="apple-touch-icon" href="./icons/icon-512.png">
 
   <style>
@@ -37,17 +36,17 @@
       background: #050816;
     }
 
-    /* Splash screen */
+    /* SPLASH SCREEN */
     #splash {
       position: fixed;
       inset: 0;
-      z-index: 10000;
+      z-index: 9999;
       background: #050816;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      transition: opacity .35s ease, visibility .35s ease;
+      flex-direction: column;
+      transition: opacity .4s ease, visibility .4s ease;
     }
 
     #splash.hide {
@@ -56,41 +55,28 @@
       pointer-events: none;
     }
 
-    #splash img {
-      width: 150px;
-      height: 150px;
+    .logo {
+      width: 155px;
+      height: 155px;
       object-fit: cover;
-      border-radius: 24px;
-      border: 1px solid #ffffff22;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.25);
       box-shadow: none;
-      outline: none;
+      filter: none;
+      animation: none;
     }
 
-    #splash h2 {
+    .title {
+      margin-top: 22px;
       color: #ffffff;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: bold;
       letter-spacing: 2px;
-      margin: 20px 0 0;
       text-align: center;
+      text-shadow: none;
     }
 
-    .loader {
-      width: 27px;
-      height: 27px;
-      margin-top: 25px;
-      border: 3px solid #ffffff33;
-      border-top: 3px solid #ffffff;
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
+    /* INTERNET STATUS */
     #networkStatus {
       position: fixed;
       top: 12px;
@@ -107,6 +93,7 @@
       white-space: nowrap;
     }
 
+    /* TOAST */
     #toast {
       position: fixed;
       bottom: 35px;
@@ -135,9 +122,12 @@
 <body>
 
   <div id="splash">
-    <img src="./icons/icon-512.png" alt="Story Za Dully">
-    <h2>STORY ZA DULLY</h2>
-    <div class="loader"></div>
+    <img
+      src="./icons/icon-512.png"
+      class="logo"
+      alt="Story Za Dully"
+    >
+    <div class="title">STORY ZA DULLY</div>
   </div>
 
   <div id="networkStatus">No Internet Connection</div>
@@ -162,11 +152,15 @@
     const splash = document.getElementById("splash");
     const blog = document.getElementById("blog");
 
+    function hideSplash() {
+      splash.classList.add("hide");
+    }
+
     blog.addEventListener("load", function () {
-      setTimeout(function () {
-        splash.classList.add("hide");
-      }, 400);
+      setTimeout(hideSplash, 500);
     });
+
+    setTimeout(hideSplash, 10000);
 
     const toast = document.getElementById("toast");
     let toastTimer;
