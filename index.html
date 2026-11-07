@@ -9,7 +9,8 @@
   <title>Story Za Dully</title>
 
   <link rel="manifest" href="./manifest.json">
-  <link rel="icon" href="./icons/icon-512.png">
+  <link rel="icon" type="image/png" sizes="512x512"
+        href="./icons/icon-512.png">
   <link rel="apple-touch-icon" href="./icons/icon-512.png">
 
   <style>
@@ -27,7 +28,7 @@
       font-family: Arial, sans-serif;
     }
 
-    iframe {
+    #blog {
       width: 100%;
       height: 100%;
       height: 100dvh;
@@ -36,22 +37,17 @@
       background: #050816;
     }
 
-    /* SPLASH SCREEN */
+    /* Splash screen */
     #splash {
       position: fixed;
       inset: 0;
-      z-index: 9999;
-      background: radial-gradient(
-        circle at center,
-        #17213a 0%,
-        #050816 75%
-      );
+      z-index: 10000;
+      background: #050816;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      flex-direction: column;
-      color: white;
-      transition: opacity .7s ease, visibility .7s ease;
+      transition: opacity .35s ease, visibility .35s ease;
     }
 
     #splash.hide {
@@ -60,44 +56,44 @@
       pointer-events: none;
     }
 
-    .logo {
-      width: 155px;
-      height: 155px;
+    #splash img {
+      width: 150px;
+      height: 150px;
       object-fit: contain;
-      border-radius: 28px;
-      filter:
-        drop-shadow(0 0 12px rgba(231,184,92,.65))
-        drop-shadow(0 0 28px rgba(231,184,92,.45))
-        drop-shadow(0 0 48px rgba(231,184,92,.25));
-      animation: logoGlow 2.5s ease-in-out infinite alternate;
+      border: none;
+      box-shadow: none;
+      outline: none;
     }
 
-    .title {
-      margin-top: 28px;
-      color: #e7b85c;
-      font-size: 25px;
+    #splash h2 {
+      color: #ffffff;
+      font-size: 22px;
       font-weight: bold;
-      letter-spacing: 3px;
-      text-align: center;
-      text-shadow: 0 0 15px rgba(231,184,92,.25);
+      letter-spacing: 2px;
+      margin: 20px 0 0;
     }
 
-    @keyframes logoGlow {
-      from {
-        filter:
-          drop-shadow(0 0 10px rgba(231,184,92,.45))
-          drop-shadow(0 0 22px rgba(231,184,92,.25));
-      }
-
-      to {
-        filter:
-          drop-shadow(0 0 18px rgba(231,184,92,.8))
-          drop-shadow(0 0 42px rgba(231,184,92,.5))
-          drop-shadow(0 0 60px rgba(231,184,92,.25));
-      }
+    #splash p {
+      color: #ffffff;
+      font-size: 13px;
+      margin-top: 9px;
+      opacity: .8;
     }
 
-    /* INTERNET STATUS */
+    .loader {
+      width: 27px;
+      height: 27px;
+      margin-top: 25px;
+      border: 3px solid #ffffff33;
+      border-top: 3px solid #ffffff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     #networkStatus {
       position: fixed;
       top: 12px;
@@ -112,10 +108,8 @@
       font-weight: bold;
       display: none;
       white-space: nowrap;
-      box-shadow: 0 4px 15px #0005;
     }
 
-    /* TOAST MESSAGE */
     #toast {
       position: fixed;
       bottom: 35px;
@@ -131,7 +125,6 @@
       visibility: hidden;
       transition: .25s ease;
       white-space: nowrap;
-      box-shadow: 0 4px 15px #0005;
     }
 
     #toast.show {
@@ -144,26 +137,16 @@
 
 <body>
 
-  <!-- SPLASH SCREEN -->
   <div id="splash">
-    <img
-      src="./icons/icon-512.png"
-      class="logo"
-      alt="Story Za Dully"
-    >
-
-    <div class="title">STORY ZA DULLY</div>
+    <img src="./icons/icon-512.png" alt="Story Za Dully">
+    <h2>STORY ZA DULLY</h2>
+    <p>Soma simulizi zako uzipendazo</p>
+    <div class="loader"></div>
   </div>
 
-  <!-- INTERNET STATUS -->
-  <div id="networkStatus">
-    No Internet Connection
-  </div>
-
-  <!-- TOAST -->
+  <div id="networkStatus">No Internet Connection</div>
   <div id="toast"></div>
 
-  <!-- BLOGGER WEBSITE -->
   <iframe
     id="blog"
     src="https://dullystory.blogspot.com/"
@@ -171,7 +154,6 @@
   </iframe>
 
   <script>
-    // SERVICE WORKER
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("./service-worker.js")
@@ -181,23 +163,15 @@
       });
     }
 
-    // SPLASH SCREEN
     const splash = document.getElementById("splash");
     const blog = document.getElementById("blog");
 
-    function hideSplash() {
-      splash.classList.add("hide");
-    }
-
     blog.addEventListener("load", function () {
-      setTimeout(hideSplash, 700);
+      setTimeout(function () {
+        splash.classList.add("hide");
+      }, 400);
     });
 
-    // Fallback
-    setTimeout(hideSplash, 10000);
-
-
-    // TOAST MESSAGE
     const toast = document.getElementById("toast");
     let toastTimer;
 
@@ -212,22 +186,15 @@
       }, 2000);
     }
 
-
-    // INTERNET CONNECTION
     const networkStatus =
       document.getElementById("networkStatus");
 
     function checkInternet() {
-      if (!navigator.onLine) {
-        networkStatus.textContent = "No Internet Connection";
-        networkStatus.style.display = "block";
-      } else {
-        networkStatus.style.display = "none";
-      }
+      networkStatus.style.display =
+        navigator.onLine ? "none" : "block";
     }
 
     window.addEventListener("offline", function () {
-      networkStatus.textContent = "No Internet Connection";
       networkStatus.style.display = "block";
     });
 
@@ -238,40 +205,23 @@
 
     checkInternet();
 
-
-    // TAP AGAIN TO EXIT
     let lastBackPress = 0;
 
-    history.pushState(
-      { exitGuard: true },
-      "",
-      location.href
-    );
+    history.pushState({ exitGuard: true }, "", location.href);
 
     window.addEventListener("popstate", function () {
       const now = Date.now();
 
       if (now - lastBackPress < 2000) {
         lastBackPress = 0;
-
-        // Allow normal Back navigation
         history.back();
-
       } else {
         lastBackPress = now;
-
         showToast("Tap again to exit");
-
-        // Restore Back guard
-        history.pushState(
-          { exitGuard: true },
-          "",
-          location.href
-        );
+        history.pushState({ exitGuard: true }, "", location.href);
       }
     });
   </script>
 
 </body>
-  </html>
-  
+</html>
