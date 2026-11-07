@@ -9,8 +9,14 @@
   <title>Story Za Dully</title>
 
   <link rel="manifest" href="./manifest.json">
-  <link rel="icon" href="./icons/icon-512.png">
-  <link rel="apple-touch-icon" href="./icons/icon-512.png">
+
+  <link rel="icon"
+        type="image/png"
+        sizes="512x512"
+        href="./icons/icon-512.png">
+
+  <link rel="apple-touch-icon"
+        href="./icons/icon-512.png">
 
   <style>
     * {
@@ -27,6 +33,7 @@
       font-family: Arial, sans-serif;
     }
 
+    /* BLOGGER */
     #blog {
       width: 100%;
       height: 100%;
@@ -46,7 +53,8 @@
       align-items: center;
       justify-content: center;
       flex-direction: column;
-      transition: opacity .4s ease, visibility .4s ease;
+      transition: opacity .4s ease,
+                  visibility .4s ease;
     }
 
     #splash.hide {
@@ -55,7 +63,7 @@
       pointer-events: none;
     }
 
-    .logo {
+    #splash img {
       width: 155px;
       height: 155px;
       object-fit: cover;
@@ -63,17 +71,57 @@
       border: 1px solid rgba(255,255,255,0.25);
       box-shadow: none;
       filter: none;
-      animation: none;
     }
 
-    .title {
-      margin-top: 22px;
+    #splash h2 {
+      margin: 22px 0 0;
       color: #ffffff;
       font-size: 24px;
       font-weight: bold;
       letter-spacing: 2px;
       text-align: center;
-      text-shadow: none;
+    }
+
+    /* INSTALL APP */
+    #installBox {
+      display: none;
+      position: fixed;
+      left: 15px;
+      right: 15px;
+      bottom: 25px;
+      z-index: 10003;
+      background: #111827;
+      color: white;
+      padding: 18px;
+      border: 1px solid #ffffff30;
+      border-radius: 14px;
+      text-align: center;
+      box-shadow: 0 5px 20px #0008;
+    }
+
+    #installBox h3 {
+      margin: 0 0 13px;
+      font-size: 16px;
+    }
+
+    #installButton {
+      width: 100%;
+      background: #ffffff;
+      color: #050816;
+      border: none;
+      border-radius: 9px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #installHelp {
+      display: none;
+      margin-top: 12px;
+      color: #ffffff;
+      font-size: 12px;
+      line-height: 1.5;
     }
 
     /* INTERNET STATUS */
@@ -91,9 +139,10 @@
       font-weight: bold;
       display: none;
       white-space: nowrap;
+      box-shadow: 0 4px 15px #0005;
     }
 
-    /* TOAST */
+    /* TOAST MESSAGE */
     #toast {
       position: fixed;
       bottom: 35px;
@@ -109,6 +158,7 @@
       visibility: hidden;
       transition: .25s ease;
       white-space: nowrap;
+      box-shadow: 0 4px 15px #0005;
     }
 
     #toast.show {
@@ -116,40 +166,82 @@
       visibility: visible;
       transform: translate(-50%, 0);
     }
+
   </style>
 </head>
 
 <body>
 
+  <!-- SPLASH SCREEN -->
   <div id="splash">
+
     <img
       src="./icons/icon-512.png"
-      class="logo"
       alt="Story Za Dully"
     >
-    <div class="title">STORY ZA DULLY</div>
+
+    <h2>STORY ZA DULLY</h2>
+
   </div>
 
-  <div id="networkStatus">No Internet Connection</div>
+
+  <!-- INTERNET STATUS -->
+  <div id="networkStatus">
+    No Internet Connection
+  </div>
+
+
+  <!-- TOAST -->
   <div id="toast"></div>
 
+
+  <!-- INSTALL APP -->
+  <div id="installBox">
+
+    <h3>INSTALL STORY ZA DULLY</h3>
+
+    <button id="installButton">
+      INSTALL APP
+    </button>
+
+    <div id="installHelp">
+      Kama popup haipatikani, fungua menyu ya Chrome
+      kisha chagua Install app au Add to Home screen,
+      ikiwa chaguo hilo linapatikana.
+    </div>
+
+  </div>
+
+
+  <!-- BLOGGER WEBSITE -->
   <iframe
     id="blog"
     src="https://dullystory.blogspot.com/"
     title="Story Za Dully">
   </iframe>
 
+
   <script>
+
+    /* SERVICE WORKER */
     if ("serviceWorker" in navigator) {
+
       window.addEventListener("load", function () {
-        navigator.serviceWorker.register("./service-worker.js")
+
+        navigator.serviceWorker
+          .register("./service-worker.js")
           .catch(function (error) {
             console.error("Service Worker:", error);
           });
+
       });
+
     }
 
+
+    /* SPLASH SCREEN */
     const splash = document.getElementById("splash");
+
     const blog = document.getElementById("blog");
 
     function hideSplash() {
@@ -157,60 +249,203 @@
     }
 
     blog.addEventListener("load", function () {
+
       setTimeout(hideSplash, 500);
+
     });
 
+    // Fallback ikiwa Blogger itachelewa kufunguka
     setTimeout(hideSplash, 10000);
 
+
+    /* TOAST MESSAGE */
     const toast = document.getElementById("toast");
+
     let toastTimer;
 
     function showToast(message) {
+
       toast.textContent = message;
+
       toast.classList.add("show");
 
       clearTimeout(toastTimer);
 
       toastTimer = setTimeout(function () {
+
         toast.classList.remove("show");
-      }, 2000);
+
+      }, 2500);
+
     }
 
+
+    /* INTERNET CONNECTION */
     const networkStatus =
       document.getElementById("networkStatus");
 
     function checkInternet() {
+
       networkStatus.style.display =
         navigator.onLine ? "none" : "block";
+
     }
 
     window.addEventListener("offline", function () {
+
       networkStatus.style.display = "block";
+
     });
 
     window.addEventListener("online", function () {
+
       networkStatus.style.display = "none";
+
       showToast("Internet Connection Restored");
+
     });
 
     checkInternet();
 
+
+    /* PWA INSTALLATION */
+    let deferredInstallPrompt = null;
+
+    const installBox =
+      document.getElementById("installBox");
+
+    const installButton =
+      document.getElementById("installButton");
+
+    const installHelp =
+      document.getElementById("installHelp");
+
+
+    // Kama app tayari imesakinishwa, usionyeshe install
+    function checkInstalled() {
+
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches;
+
+      const androidApp =
+        window.navigator.standalone === true;
+
+      if (standalone || androidApp) {
+
+        installBox.style.display = "none";
+
+        return true;
+
+      }
+
+      return false;
+
+    }
+
+
+    // Chrome ikiruhusu kusakinisha
+    window.addEventListener(
+      "beforeinstallprompt",
+      function (event) {
+
+        event.preventDefault();
+
+        deferredInstallPrompt = event;
+
+        if (!checkInstalled()) {
+
+          installBox.style.display = "block";
+
+          installHelp.style.display = "none";
+
+        }
+
+      }
+    );
+
+
+    // Mtumiaji akibonyeza INSTALL APP
+    installButton.addEventListener("click", async function () {
+
+      if (deferredInstallPrompt) {
+
+        deferredInstallPrompt.prompt();
+
+        const result =
+          await deferredInstallPrompt.userChoice;
+
+        deferredInstallPrompt = null;
+
+        installBox.style.display = "none";
+
+        if (result.outcome === "accepted") {
+
+          showToast("Installation Started");
+
+        }
+
+      } else {
+
+        installHelp.style.display = "block";
+
+        showToast("Angalia maelekezo ya kusakinisha");
+
+      }
+
+    });
+
+
+    // App ikishasakinishwa
+    window.addEventListener("appinstalled", function () {
+
+      installBox.style.display = "none";
+
+      deferredInstallPrompt = null;
+
+      showToast("Story Za Dully Installed!");
+
+    });
+
+
+    // Usionyeshe kitufe kama tayari imesakinishwa
+    checkInstalled();
+
+
+    /* BACK BUTTON */
     let lastBackPress = 0;
 
-    history.pushState({ exitGuard: true }, "", location.href);
+    history.pushState(
+      { exitGuard: true },
+      "",
+      location.href
+    );
 
     window.addEventListener("popstate", function () {
+
       const now = Date.now();
 
       if (now - lastBackPress < 2000) {
+
         lastBackPress = 0;
+
         history.back();
+
       } else {
+
         lastBackPress = now;
+
         showToast("Tap again to exit");
-        history.pushState({ exitGuard: true }, "", location.href);
+
+        history.pushState(
+          { exitGuard: true },
+          "",
+          location.href
+        );
+
       }
+
     });
+
   </script>
 
 </body>
