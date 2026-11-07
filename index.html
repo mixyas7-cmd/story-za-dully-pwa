@@ -24,6 +24,7 @@
       height: 100%;
       overflow: hidden;
       background: #050816;
+      font-family: Arial, sans-serif;
     }
 
     iframe {
@@ -34,29 +35,233 @@
       display: block;
       background: #050816;
     }
+
+    /* SPLASH SCREEN */
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: radial-gradient(
+        circle at center,
+        #17213a 0%,
+        #050816 70%
+      );
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      color: white;
+      transition: opacity .6s ease, visibility .6s ease;
+    }
+
+    #splash.hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .logo {
+      width: 125px;
+      height: 125px;
+      object-fit: contain;
+      border-radius: 25px;
+      animation: glow 2s infinite alternate;
+    }
+
+    .title {
+      margin-top: 25px;
+      color: #e7b85c;
+      font-size: 25px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      text-align: center;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: #b9bfd0;
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+
+    @keyframes glow {
+      from {
+        filter: drop-shadow(0 0 5px #e7b85c);
+      }
+      to {
+        filter: drop-shadow(0 0 22px #e7b85c);
+      }
+    }
+
+    /* INTERNET STATUS */
+    #networkStatus {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10001;
+      background: #c62828;
+      color: white;
+      padding: 11px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+      display: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px #0005;
+    }
+
+    /* EXIT TOAST */
+    #toast {
+      position: fixed;
+      bottom: 35px;
+      left: 50%;
+      transform: translate(-50%, 20px);
+      z-index: 10002;
+      background: #292929;
+      color: white;
+      padding: 13px 22px;
+      border-radius: 25px;
+      font-size: 14px;
+      opacity: 0;
+      visibility: hidden;
+      transition: .25s ease;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px #0005;
+    }
+
+    #toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
   </style>
 </head>
 
 <body>
 
+  <!-- SPLASH SCREEN -->
+  <div id="splash">
+    <img
+      src="./icons/icon-512.png"
+      class="logo"
+      alt="Story Za Dully"
+    >
+
+    <div class="title">STORY ZA DULLY</div>
+    <div class="subtitle">MAKTABA YAKO YA SIMULIZI</div>
+  </div>
+
+  <!-- INTERNET STATUS -->
+  <div id="networkStatus">
+    No Internet Connection
+  </div>
+
+  <!-- EXIT MESSAGE -->
+  <div id="toast"></div>
+
+  <!-- BLOGGER WEBSITE -->
   <iframe
+    id="blog"
     src="https://dullystory.blogspot.com/"
-    title="Story Za Dully"
-    allow="fullscreen">
+    title="Story Za Dully">
   </iframe>
 
   <script>
+    // SERVICE WORKER
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
         navigator.serviceWorker.register("./service-worker.js")
-          .then(function (registration) {
-            console.log("PWA Service Worker ready");
-          })
           .catch(function (error) {
             console.error("Service Worker:", error);
           });
       });
     }
+
+    // SPLASH SCREEN
+    const splash = document.getElementById("splash");
+    const blog = document.getElementById("blog");
+
+    function hideSplash() {
+      splash.classList.add("hide");
+    }
+
+    blog.addEventListener("load", function () {
+      setTimeout(hideSplash, 700);
+    });
+
+    // Fallback: prevent splash from staying forever
+    setTimeout(hideSplash, 8000);
+
+
+    // INTERNET CONNECTION
+    const networkStatus =
+      document.getElementById("networkStatus");
+
+    function checkInternet() {
+      if (!navigator.onLine) {
+        networkStatus.textContent = "No Internet Connection";
+        networkStatus.style.display = "block";
+      } else {
+        networkStatus.style.display = "none";
+      }
+    }
+
+    window.addEventListener("offline", function () {
+      networkStatus.textContent = "No Internet Connection";
+      networkStatus.style.display = "block";
+    });
+
+    window.addEventListener("online", function () {
+      networkStatus.style.display = "none";
+      showToast("Internet Connection Restored");
+    });
+
+    checkInternet();
+
+
+    // TOAST MESSAGE
+    const toast = document.getElementById("toast");
+    let toastTimer;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+
+      clearTimeout(toastTimer);
+
+      toastTimer = setTimeout(function () {
+        toast.classList.remove("show");
+      }, 2000);
+    }
+
+
+    // TAP AGAIN TO EXIT
+    let lastBackPress = 0;
+
+    // Add a history entry to catch the first Back press
+    history.pushState({ exitGuard: true }, "", location.href);
+
+    window.addEventListener("popstate", function () {
+      const now = Date.now();
+
+      if (now - lastBackPress < 2000) {
+        // Second Back press: allow normal exit navigation
+        lastBackPress = 0;
+        history.back();
+      } else {
+        // First Back press
+        lastBackPress = now;
+        showToast("Tap again to exit");
+
+        // Restore the exit guard
+        history.pushState(
+          { exitGuard: true },
+          "",
+          location.href
+        );
+      }
+    });
   </script>
 
 </body>
