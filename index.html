@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="sw">
 <head>
@@ -201,6 +200,25 @@
       visibility: visible;
       transform: translate(-50%, 0);
     }
+
+    /* NOTIFY BUTTON */
+    #notifyButton {
+      position: fixed;
+      bottom: 25px;
+      right: 20px;
+      z-index: 9000;
+      width: 52px;
+      height: 52px;
+      border: none;
+      border-radius: 50%;
+      background: #ffffff;
+      font-size: 24px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
   </style>
 </head>
 
@@ -257,6 +275,8 @@
   </div>
 
   <div id="toast"></div>
+
+  <button id="notifyButton" aria-label="Washa Notification">🔔</button>
 
 
   <script>
@@ -480,6 +500,35 @@
       }
 
     });
+
+
+    /* NOTIFY BUTTON */
+    const notifyButton =
+      document.getElementById("notifyButton");
+
+    function updateNotifyButton() {
+      if (!("Notification" in window) ||
+          Notification.permission !== "default") {
+        notifyButton.style.display = "none";
+      } else {
+        notifyButton.style.display = "flex";
+      }
+    }
+
+    notifyButton.addEventListener("click", async function () {
+      const permission =
+        await Notification.requestPermission();
+
+      updateNotifyButton();
+
+      if (permission === "granted") {
+        showToast("Notification zimewashwa");
+      } else {
+        showToast("Hukuruhusu notification");
+      }
+    });
+
+    updateNotifyButton();
 
   </script>
 
