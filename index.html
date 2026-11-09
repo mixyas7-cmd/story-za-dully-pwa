@@ -201,23 +201,72 @@
       transform: translate(-50%, 0);
     }
 
-    /* NOTIFY BUTTON */
-    #notifyButton {
+    /* NOTIFICATION PROMPT */
+    #notifyPrompt {
       position: fixed;
-      bottom: 25px;
-      right: 20px;
-      z-index: 9000;
-      width: 52px;
-      height: 52px;
-      border: none;
-      border-radius: 50%;
-      background: #ffffff;
-      font-size: 24px;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0,0,0,0.65);
       display: none;
       align-items: center;
       justify-content: center;
+      padding: 25px;
+    }
+
+    #notifyBox {
+      width: 100%;
+      max-width: 340px;
+      background: #0d1226;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 18px;
+      padding: 28px 22px 22px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    }
+
+    #notifyIcon {
+      font-size: 42px;
+      margin-bottom: 12px;
+    }
+
+    #notifyTitle {
+      color: #ffffff;
+      font-size: 17px;
+      font-weight: bold;
+      margin: 0 0 10px;
+    }
+
+    #notifyText {
+      color: #b8bdca;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 22px;
+    }
+
+    #notifyButtons {
+      display: flex;
+      gap: 10px;
+    }
+
+    #notifyButtons button {
+      flex: 1;
+      padding: 14px 10px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+
+    #notifyDeny {
+      background: transparent;
+      border: 1px solid #3a4160;
+      color: #b8bdca;
+    }
+
+    #notifyAllow {
+      background: #ffffff;
+      border: none;
+      color: #050816;
     }
   </style>
 </head>
@@ -276,7 +325,20 @@
 
   <div id="toast"></div>
 
-  <button id="notifyButton" aria-label="Washa Notification">🔔</button>
+  <!-- NOTIFICATION PROMPT -->
+  <div id="notifyPrompt">
+    <div id="notifyBox">
+      <div id="notifyIcon">🔔</div>
+      <h3 id="notifyTitle">Pata Taarifa za Story Mpya</h3>
+      <p id="notifyText">
+        Ruhusu taarifa zikufikie punde tunapopakia story mpya.
+      </p>
+      <div id="notifyButtons">
+        <button id="notifyDeny">Kataa</button>
+        <button id="notifyAllow">Ruhusu</button>
+      </div>
+    </div>
+  </div>
 
 
   <script>
@@ -310,6 +372,7 @@
     /* HIDE INSTALL PAGE */
     function openBlogger() {
       installPage.style.display = "none";
+      setTimeout(maybeShowPrompt, 1200);
     }
 
 
@@ -502,10 +565,7 @@
     });
 
 
-    /* NOTIFY BUTTON + FIREBASE */
-    const notifyButton =
-      document.getElementById("notifyButton");
-
+    /* FIREBASE */
     const firebaseConfig = {
       apiKey: "AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
       authDomain: "mfano-c0401.firebaseapp.com",
@@ -549,34 +609,67 @@
       );
     }
 
-    function updateNotifyButton() {
-      if (!("Notification" in window) ||
-          Notification.permission !== "default") {
-        notifyButton.style.display = "none";
-      } else {
-        notifyButton.style.display = "flex";
+
+    /* NOTIFICATION PROMPT */
+    const DENY_KEY = "notifyDeniedAt";
+    const DENY_DAYS = 3;
+
+    function wasDeniedRecently() {
+      try {
+        const t = parseInt(localStorage.getItem(DENY_KEY) || "0", 10);
+        if (!t) return false;
+        return (Date.now() - t) < DENY_DAYS * 24 * 60 * 60 * 1000;
+      } catch (e) {
+        return false;
       }
     }
 
-    notifyButton.addEventListener("click", async function () {
-      const permission =
-        await Notification.requestPermission();
+    function hidePrompt() {
+      document.getElementById("notifyPrompt").style.display = "none";
+    }
 
-      updateNotifyButton();
+    function maybeShowPrompt() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "default") return;
+      if (wasDeniedRecently()) return;
+      if (installPage.style.display !== "none") return;
 
-      if (permission !== "granted") {
-        showToast("Hukuruhusu notification");
-        return;
-      }
+      document.getElementById("notifyPrompt").style.display = "flex";
+    }
 
-      try {
-        await saveToken();
-        showToast("Notification zimewashwa");
-      } catch (error) {
-        console.error(error);
-        showToast("Hitilafu: " + error.message);
-      }
-    });
+    document.getElementById("notifyAllow")
+      .addEventListener("click", async function () {
+
+        hidePrompt();
+
+        const permission =
+          await Notification.requestPermission();
+
+        if (permission !== "granted") {
+          showToast("Hukuruhusu notification");
+          return;
+        }
+
+        try {
+          await saveToken();
+          showToast("Notification zimewashwa");
+        } catch (error) {
+          console.error(error);
+          showToast("Hitilafu: " + error.message);
+        }
+
+      });
+
+    document.getElementById("notifyDeny")
+      .addEventListener("click", function () {
+
+        try {
+          localStorage.setItem(DENY_KEY, String(Date.now()));
+        } catch (e) {}
+
+        hidePrompt();
+
+      });
 
     /* Ruhusa ikishatolewa, hifadhi token kimya kimya */
     if ("Notification" in window &&
@@ -585,8 +678,6 @@
         console.error(e);
       });
     }
-
-    updateNotifyButton();
 
   </script>
 
