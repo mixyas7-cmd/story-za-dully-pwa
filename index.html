@@ -506,13 +506,13 @@
     const notifyButton =
       document.getElementById("notifyButton");
 
-    function updateNotifyButton() {
-      if (!("Notification" in window) ||
-          Notification.permission !== "default") {
-        notifyButton.style.display = "none";
-      } else {
-        notifyButton.style.display = "flex";
+        function updateNotifyButton() {
+      if (!("Notification" in window)) {
+        showToast("Simu hii haiungi mkono notification");
+        return;
       }
+      showToast("Hali ya ruhusa: " + Notification.permission);
+      notifyButton.style.display = "flex";
     }
 
     notifyButton.addEventListener("click", async function () {
