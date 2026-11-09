@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin - Story Za Dully</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #050816;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+    }
+    .box { max-width: 420px; margin: 0 auto; }
+    h1 { font-size: 20px; text-align: center; }
+    label { display: block; margin: 16px 0 6px; font-size: 13px; color: #b8bdca; }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #333a55;
+      background: #0d1226;
+      color: #ffffff;
+      font-size: 15px;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    button {
+      width: 100%;
+      margin-top: 22px;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #050816;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; }
+    #status {
+      margin-top: 18px;
+      font-size: 14px;
+      line-height: 1.6;
+      text-align: center;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Tuma Notification</h1>
+
+    <label>Password ya admin</label>
+    <input type="password" id="password" autocomplete="current-password">
+
+    <label>Kichwa (title)</label>
+    <input type="text" id="title" maxlength="100">
+
+    <label>Ujumbe</label>
+    <textarea id="body" maxlength="300"></textarea>
+
+    <label>Link (si lazima)</label>
+    <input type="text" id="url" placeholder="Acha tupu kufungua app">
+
+    <button id="send">TUMA SASA</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const WORKER_URL = "https://dully-notify.dullyofficial2000.workers.dev";
+
+    const sendBtn = document.getElementById("send");
+    const statusBox = document.getElementById("status");
+
+    async function callWorker(payload) {
+      const res = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Hitilafu");
+      return data;
+    }
+
+    sendBtn.addEventListener("click", async function () {
+      const password = document.getElementById("password").value;
+      const title = document.getElementById("title").value.trim();
+      const body = document.getElementById("body").value.trim();
+      const url = document.getElementById("url").value.trim();
+
+      if (!password || !title || !body) {
+        statusBox.textContent = "Jaza password, kichwa na ujumbe.";
+        return;
+      }
+
+      sendBtn.disabled = true;
+      let skip = 0;
+      let sent = 0;
+      let failed = 0;
+
+      try {
+        while (skip !== null) {
+          statusBox.textContent = "Inatuma... (zimetumwa " + sent + ")";
+          const payload = { password: password, title: title, body: body, skip: skip };
+          if (url) payload.url = url;
+
+          const r = await callWorker(payload);
+          sent += r.sent;
+          failed += r.failed;
+          skip = r.next;
+        }
+        statusBox.textContent =
+          "Imekamilika ✅\nZimetumwa: " + sent + "\nZimeshindwa: " + failed;
+      } catch (e) {
+        statusBox.textContent = "Hitilafu: " + e.message;
+      }
+
+      sendBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>
