@@ -1,5 +1,4 @@
-
-const CACHE_NAME = "story-za-dully-v4";
+const CACHE_NAME = "story-za-dully-v5";
 
 const FILES_TO_CACHE = [
   "/story-za-dully-pwa/",
@@ -94,7 +93,6 @@ self.addEventListener("fetch", (event) => {
 
 });
 
-
 /* PUSH NOTIFICATION */
 self.addEventListener("push", (event) => {
   let payload = {};
@@ -105,10 +103,11 @@ self.addEventListener("push", (event) => {
   const data = payload.data || payload.notification || payload;
   const title = data.title || "Story za Dully";
 
+  const iconUrl = new URL("icons/icon-192.png", self.registration.scope).href;
+
   const options = {
     body: data.body || "",
-    icon: "/story-za-dully-pwa/icons/icon-192.png",
-    badge: "/story-za-dully-pwa/icons/icon-192.png",
+    icon: iconUrl,
     data: { url: data.url || "/story-za-dully-pwa/" }
   };
 
