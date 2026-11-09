@@ -502,11 +502,54 @@
     });
 
 
-    /* NOTIFY BUTTON */
+    /* NOTIFY BUTTON + FIREBASE */
     const notifyButton =
       document.getElementById("notifyButton");
 
-      function updateNotifyButton() {
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
+      authDomain: "mfano-c0401.firebaseapp.com",
+      projectId: "mfano-c0401",
+      storageBucket: "mfano-c0401.firebasestorage.app",
+      messagingSenderId: "322823059663",
+      appId: "1:322823059663:web:cc885bd9c5631987309fba"
+    };
+
+    const VAPID_KEY =
+      "BFEdvTtcVdO21MC7oTMnhBzgSeUfvIw5RSoLGP4gFIg_oDac4eyt3u353wCt7YEI_Vz74CXMW-y072a8-qhmREQ";
+
+    const FB = "https://www.gstatic.com/firebasejs/10.14.1/";
+
+    async function saveToken() {
+      const appMod = await import(FB + "firebase-app.js");
+      const msgMod = await import(FB + "firebase-messaging.js");
+      const dbMod = await import(FB + "firebase-firestore.js");
+
+      const app = appMod.initializeApp(firebaseConfig);
+      const messaging = msgMod.getMessaging(app);
+      const reg = await navigator.serviceWorker.ready;
+
+      const token = await msgMod.getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: reg
+      });
+
+      if (!token) {
+        throw new Error("Token haikupatikana");
+      }
+
+      const db = dbMod.getFirestore(app);
+
+      await dbMod.setDoc(
+        dbMod.doc(db, "tokens", token),
+        {
+          token: token,
+          createdAt: dbMod.serverTimestamp()
+        }
+      );
+    }
+
+    function updateNotifyButton() {
       if (!("Notification" in window) ||
           Notification.permission !== "default") {
         notifyButton.style.display = "none";
@@ -521,12 +564,27 @@
 
       updateNotifyButton();
 
-      if (permission === "granted") {
-        showToast("Notification zimewashwa");
-      } else {
+      if (permission !== "granted") {
         showToast("Hukuruhusu notification");
+        return;
+      }
+
+      try {
+        await saveToken();
+        showToast("Notification zimewashwa");
+      } catch (error) {
+        console.error(error);
+        showToast("Hitilafu: " + error.message);
       }
     });
+
+    /* Ruhusa ikishatolewa, hifadhi token kimya kimya */
+    if ("Notification" in window &&
+        Notification.permission === "granted") {
+      saveToken().catch(function (e) {
+        console.error(e);
+      });
+    }
 
     updateNotifyButton();
 
