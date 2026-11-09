@@ -1,5 +1,5 @@
 
-const CACHE_NAME = "story-za-dully-v3";
+const CACHE_NAME = "story-za-dully-v4";
 
 const FILES_TO_CACHE = [
   "/story-za-dully-pwa/",
@@ -92,4 +92,42 @@ self.addEventListener("fetch", (event) => {
       })
   );
 
+});
+
+
+/* PUSH NOTIFICATION */
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {}
+
+  const data = payload.data || payload.notification || payload;
+  const title = data.title || "Story za Dully";
+
+  const options = {
+    body: data.body || "",
+    icon: "/story-za-dully-pwa/icons/icon-192.png",
+    badge: "/story-za-dully-pwa/icons/icon-192.png",
+    data: { url: data.url || "/story-za-dully-pwa/" }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+/* BONYEZA NOTIFICATION */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data.url;
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url.includes("/story-za-dully-pwa/") && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow(targetUrl);
+    })
+  );
 });
