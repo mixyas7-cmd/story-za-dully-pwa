@@ -44,6 +44,15 @@
       font-size: 20px;
       border-radius: 8px;
     }
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: #b8bdca;
+    }
+    .remember input { width: auto; margin: 0; }
     .counter { text-align: right; font-size: 12px; color: #8a91a8; margin-top: 4px; }
     button {
       width: 100%;
@@ -107,6 +116,10 @@
       <input type="password" id="password" autocomplete="current-password">
       <button type="button" id="eye" aria-label="Onyesha password">👁</button>
     </div>
+    <label class="remember">
+      <input type="checkbox" id="remember">
+      Nikumbuke kwenye simu hii
+    </label>
 
     <label>Kichwa (title)</label>
     <input type="text" id="title" maxlength="100">
@@ -130,13 +143,36 @@
 
   <script>
     const WORKER_URL = "https://dully-notify.dullyofficial2000.workers.dev";
+    const PASS_KEY = "dullyAdminPass";
 
     const passInput = document.getElementById("password");
     const eyeBtn = document.getElementById("eye");
+    const rememberBox = document.getElementById("remember");
     const bodyInput = document.getElementById("body");
     const sendBtn = document.getElementById("send");
     const statusBox = document.getElementById("status");
     const historyBox = document.getElementById("history");
+
+    /* KUMBUKA PASSWORD */
+    function savePass() {
+      try {
+        if (rememberBox.checked && passInput.value) {
+          localStorage.setItem(PASS_KEY, passInput.value);
+        } else {
+          localStorage.removeItem(PASS_KEY);
+        }
+      } catch (e) {}
+    }
+
+    try {
+      const saved = localStorage.getItem(PASS_KEY);
+      if (saved) {
+        passInput.value = saved;
+        rememberBox.checked = true;
+      }
+    } catch (e) {}
+
+    rememberBox.addEventListener("change", savePass);
 
     /* JICHO */
     eyeBtn.addEventListener("click", function () {
@@ -182,6 +218,7 @@
 
       try {
         const r = await callWorker("/history", { password: password });
+        savePass();
         historyBox.textContent = "";
 
         if (!r.messages.length) {
@@ -236,9 +273,13 @@
 
     passInput.addEventListener("change", loadHistory);
 
+    /* Jisasishe kila sekunde 10 */
     setInterval(function () {
       if (!document.hidden) loadHistory();
     }, 10000);
+
+    /* Fungua historia moja kwa moja kama password imekumbukwa */
+    loadHistory();
 
     /* KUTUMA */
     sendBtn.addEventListener("click", async function () {
