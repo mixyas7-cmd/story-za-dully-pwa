@@ -9,18 +9,19 @@ importScripts(
   "https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"
 );
 
-const firebaseConfig = {
+/* FIREBASE CONFIGURATION */
+
+firebase.initializeApp({
   apiKey: "AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
   authDomain: "mfano-c0401.firebaseapp.com",
   databaseURL: "https://mfano-c0401-default-rtdb.firebaseio.com",
   projectId: "mfano-c0401",
   storageBucket: "mfano-c0401.firebasestorage.app",
   messagingSenderId: "322823059663",
-  appId: "1:322823059663:web:cc885bd9c5631987309fba",
-  measurementId: "G-W7H32ENGZK"
-};
+  appId: "1:322823059663:web:cc885bd9c5631987309fba"
+});
 
-firebase.initializeApp(firebaseConfig);
+/* INITIALIZE MESSAGING */
 
 const messaging = firebase.messaging();
 
@@ -29,20 +30,21 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
 
   console.log(
-    "[Story Za Dully] Background message:",
+    "[firebase-messaging-sw.js] Background message:",
     payload
   );
 
   const notificationTitle =
     payload.notification?.title ||
     payload.data?.title ||
-    "Story Za Dully";
+    "STORY ZA DULLY";
 
   const notificationOptions = {
+
     body:
       payload.notification?.body ||
       payload.data?.body ||
-      "Kuna taarifa mpya kutoka Story Za Dully.",
+      "Kuna taarifa mpya. Fungua Story Za Dully.",
 
     icon: "./icons/icon-192.png",
 
@@ -50,12 +52,13 @@ messaging.onBackgroundMessage((payload) => {
 
     data: {
       url:
-        payload.fcmOptions?.link ||
         payload.data?.url ||
-        "https://mixyas7-cmd.github.io/dully-story-app-pwa/"
+        "https://mixyas7-cmd.github.io/story-za-dully-pwa/"
     },
 
-    tag: payload.data?.tag || "story-za-dully"
+    tag: "story-za-dully-notification",
+
+    renotify: true
   };
 
   return self.registration.showNotification(
@@ -73,19 +76,25 @@ self.addEventListener("notificationclick", (event) => {
 
   const targetUrl =
     event.notification.data?.url ||
-    "https://mixyas7-cmd.github.io/dully-story-app-pwa/";
+    "https://mixyas7-cmd.github.io/story-za-dully-pwa/";
 
   event.waitUntil(
     clients.matchAll({
       type: "window",
       includeUncontrolled: true
-    }).then((windowClients) => {
+    }).then((clientList) => {
 
-      for (const client of windowClients) {
+      for (const client of clientList) {
 
-        if ("focus" in client) {
-          return client.navigate(targetUrl)
-            .then(() => client.focus());
+        if (
+          client.url.startsWith(
+            "https://mixyas7-cmd.github.io/"
+          ) &&
+          "focus" in client
+        ) {
+          return client.navigate(targetUrl).then(() =>
+            client.focus()
+          );
         }
 
       }
