@@ -2,418 +2,451 @@
 <!DOCTYPE html>
 <html lang="sw">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#050816">
-<title>Story Za Dully</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#050816">
 
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
-<link rel="apple-touch-icon" href="./icons/icon-512.png">
+  <title>Story Za Dully</title>
 
-<style>
-*{box-sizing:border-box}
-html,body{
-margin:0;padding:0;width:100%;height:100%;
-overflow:hidden;background:#050816;font-family:Arial,sans-serif
-}
-#blog{
-width:100%;height:100%;height:100dvh;
-border:none;display:block;background:#050816
-}
-#installPage{
-position:fixed;inset:0;z-index:9999;background:#050816;
-display:flex;align-items:center;justify-content:center;
-padding:25px;text-align:center
-}
-#installContent{
-width:100%;max-width:360px;display:flex;
-flex-direction:column;align-items:center;justify-content:center
-}
-#installLogo{
-width:105px;height:105px;object-fit:cover;
-border-radius:23px;border:1px solid rgba(255,255,255,.25);
-margin-bottom:28px
-}
-#installTitle{
-color:#fff;font-size:19px;font-weight:bold;
-letter-spacing:1.2px;margin:0 0 10px
-}
-#installDescription{
-color:#b8bdca;font-size:13px;line-height:1.6;
-margin:0 0 27px;max-width:290px
-}
-#installButton{
-position:relative;overflow:hidden;width:100%;max-width:280px;
-padding:16px 20px;border:none;border-radius:10px;
-background:#fff;color:#050816;font-size:15px;
-font-weight:800;letter-spacing:1.5px;cursor:pointer
-}
-#installButton::before{
-content:"";position:absolute;top:0;left:-120%;
-width:65%;height:100%;
-background:linear-gradient(110deg,transparent,rgba(255,255,255,.95),transparent);
-transform:skewX(-25deg);animation:shimmer 2s infinite;
-pointer-events:none
-}
-@keyframes shimmer{0%{left:-120%}45%,100%{left:150%}}
-#installButton:active{transform:scale(.97)}
-#installHelp{
-display:none;color:#d5d8e0;font-size:12px;
-line-height:1.7;margin-top:20px;max-width:300px
-}
-#continueButton{
-display:none;margin-top:20px;padding:10px;
-background:transparent;border:none;color:#aeb5c5;
-font-size:12px;text-decoration:underline;cursor:pointer
-}
-#networkStatus{
-position:fixed;top:12px;left:50%;transform:translateX(-50%);
-z-index:10001;background:#c62828;color:white;
-padding:12px 18px;border-radius:8px;font-size:13px;
-font-weight:bold;display:none;white-space:nowrap
-}
-#toast{
-position:fixed;bottom:35px;left:50%;
-transform:translate(-50%,20px);z-index:10005;
-background:#292929;color:white;padding:13px 22px;
-border-radius:25px;font-size:13px;opacity:0;
-visibility:hidden;transition:.25s ease;
-white-space:nowrap;max-width:90%;text-align:center
-}
-#toast.show{
-opacity:1;visibility:visible;transform:translate(-50%,0)
-}
-#notificationButton{
-position:fixed;right:14px;bottom:14px;z-index:10003;
-border:1px solid rgba(255,255,255,.2);
-background:#151d35;color:#fff;padding:12px 16px;
-border-radius:30px;font-size:12px;font-weight:bold;
-box-shadow:0 4px 18px rgba(0,0,0,.4);cursor:pointer
-}
-#notificationButton:disabled{opacity:.6}
-</style>
+  <link rel="manifest" href="./manifest.json">
+
+  <link rel="icon"
+        type="image/png"
+        sizes="512x512"
+        href="./icons/icon-512.png">
+
+  <link rel="apple-touch-icon"
+        href="./icons/icon-512.png">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #050816;
+      font-family: Arial, sans-serif;
+    }
+
+    /* BLOGGER */
+    #blog {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      border: none;
+      display: block;
+      background: #050816;
+    }
+
+    /* SPLASH SCREEN */
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #050816;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      transition: opacity .4s ease,
+                  visibility .4s ease;
+    }
+
+    #splash.hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    #splash img {
+      width: 155px;
+      height: 155px;
+      object-fit: cover;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.25);
+      box-shadow: none;
+      filter: none;
+    }
+
+    #splash h2 {
+      margin: 22px 0 0;
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+
+    /* INSTALL APP */
+    #installBox {
+      display: none;
+      position: fixed;
+      left: 15px;
+      right: 15px;
+      bottom: 25px;
+      z-index: 10003;
+      background: #111827;
+      color: white;
+      padding: 18px;
+      border: 1px solid #ffffff30;
+      border-radius: 14px;
+      text-align: center;
+      box-shadow: 0 5px 20px #0008;
+    }
+
+    #installBox h3 {
+      margin: 0 0 13px;
+      font-size: 16px;
+    }
+
+    #installButton {
+      width: 100%;
+      background: #ffffff;
+      color: #050816;
+      border: none;
+      border-radius: 9px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #installHelp {
+      display: none;
+      margin-top: 12px;
+      color: #ffffff;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* INTERNET STATUS */
+    #networkStatus {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10001;
+      background: #c62828;
+      color: white;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+      display: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px #0005;
+    }
+
+    /* TOAST MESSAGE */
+    #toast {
+      position: fixed;
+      bottom: 35px;
+      left: 50%;
+      transform: translate(-50%, 20px);
+      z-index: 10002;
+      background: #292929;
+      color: white;
+      padding: 13px 22px;
+      border-radius: 25px;
+      font-size: 14px;
+      opacity: 0;
+      visibility: hidden;
+      transition: .25s ease;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px #0005;
+    }
+
+    #toast.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
+
+  </style>
 </head>
 
 <body>
 
-<div id="installPage">
-<div id="installContent">
-<img id="installLogo" src="./icons/icon-512.png" alt="Story Za Dully">
-<h2 id="installTitle">PAKUA STORY ZA DULLY APP</h2>
-<p id="installDescription">
-Furahia kusoma simulizi zako uzipendazo kupitia Story Za Dully App.
-</p>
-<button id="installButton">INSTALL APP</button>
-<div id="installHelp">
-Ili kusakinisha app, fungua menyu ya Chrome kupitia alama ya nukta tatu (⋮), kisha chagua
-<b>Install app</b> au <b>Add to Home screen</b>.
-</div>
-<button id="continueButton">Endelea bila kusakinisha</button>
-</div>
-</div>
-
-<iframe id="blog" src="https://dullystory.blogspot.com/" title="Story Za Dully"></iframe>
-
-<button id="notificationButton" type="button">
-🔔 WASHA NOTIFICATIONS
-</button>
-
-<div id="networkStatus">No Internet Connection</div>
-<div id="toast"></div>
-
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
-
-<script>
-/* FIREBASE CONFIGURATION */
-
-const firebaseConfig = {
-apiKey:"AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
-authDomain:"mfano-c0401.firebaseapp.com",
-databaseURL:"https://mfano-c0401-default-rtdb.firebaseio.com",
-projectId:"mfano-c0401",
-storageBucket:"mfano-c0401.firebasestorage.app",
-messagingSenderId:"322823059663",
-appId:"1:322823059663:web:cc885bd9c5631987309fba",
-measurementId:"G-W7H32ENGZK"
-};
-
-const VAPID_PUBLIC_KEY =
-"BFEdvTtcVdO21MC7oTMnhBzgSeUfvIw5RSoLGP4gFIg_oDac4eyt3u353wCt7YEI_Vz74CXMW-y072a8-qhmREQ";
-
-const WORKER_URL =
-"https://dully-story-notifications.dullyofficial2000.workers.dev";
-
-const REGISTER_ENDPOINT = WORKER_URL + "/register-token";
-
-/* ELEMENTS */
-
-const installPage=document.getElementById("installPage");
-const installButton=document.getElementById("installButton");
-const installHelp=document.getElementById("installHelp");
-const continueButton=document.getElementById("continueButton");
-const notificationButton=document.getElementById("notificationButton");
-const toast=document.getElementById("toast");
-const networkStatus=document.getElementById("networkStatus");
-
-let toastTimer;
-
-function showToast(message){
-toast.textContent=message;
-toast.classList.add("show");
-clearTimeout(toastTimer);
-toastTimer=setTimeout(()=>toast.classList.remove("show"),3000);
-}
-
-/* INSTALLATION */
-
-function openBlogger(){
-installPage.style.display="none";
-}
-
-function checkInstalled(){
-const standalone=window.matchMedia("(display-mode: standalone)").matches;
-const androidApp=window.navigator.standalone===true;
-if(standalone||androidApp){
-openBlogger();
-return true;
-}
-return false;
-}
-
-let deferredInstallPrompt=null;
-
-window.addEventListener("beforeinstallprompt",event=>{
-event.preventDefault();
-deferredInstallPrompt=event;
-installHelp.style.display="none";
-});
-
-installButton.addEventListener("click",async()=>{
-if(deferredInstallPrompt){
-deferredInstallPrompt.prompt();
-const result=await deferredInstallPrompt.userChoice;
-deferredInstallPrompt=null;
-if(result.outcome==="accepted"){
-showToast("Installation Started");
-openBlogger();
-}else{
-showToast("Installation Cancelled");
-}
-}else{
-installHelp.style.display="block";
-continueButton.style.display="block";
-}
-});
-
-window.addEventListener("appinstalled",()=>{
-openBlogger();
-deferredInstallPrompt=null;
-showToast("Story Za Dully Installed!");
-});
-
-continueButton.addEventListener("click",openBlogger);
-checkInstalled();
-
-/* SERVICE WORKER */
-
-let swRegistration=null;
-
-async function registerServiceWorker(){
-if(!("serviceWorker" in navigator)){
-throw new Error("Browser haitumii Service Worker.");
-}
-
-swRegistration=await navigator.serviceWorker.register("./service-worker.js");
-
-await navigator.serviceWorker.ready;
-
-return swRegistration;
-}
-
-/* FIREBASE */
-
-let messaging=null;
-let firebaseReady=false;
-
-async function initializeFirebase(){
-if(!window.firebase){
-throw new Error("Firebase SDK haijapakia.");
-}
-
-if(!firebase.apps.length){
-firebase.initializeApp(firebaseConfig);
-}
-
-if(!await firebase.messaging.isSupported()){
-throw new Error("Browser hii haitumii Firebase Messaging.");
-}
-
-if(!messaging){
-messaging=firebase.messaging();
-
-messaging.onMessage(payload=>{
-const title=payload.notification?.title||
-payload.data?.title||"Story Za Dully";
+  <!-- SPLASH SCREEN -->
+  <div id="splash">
 
-showToast("🔔 "+title);
-
-if(Notification.permission==="granted"){
-try{
-const notification=new Notification(title,{
-body:payload.notification?.body||
-payload.data?.body||"Una ujumbe mpya kutoka Story Za Dully.",
-icon:"./icons/icon-192.png"
-});
-notification.onclick=()=>{
-window.focus();
-notification.close();
-};
-}catch(error){
-console.warn("Foreground notification:",error);
-}
-}
-});
-}
-
-firebaseReady=true;
-return true;
-}
-
-/* TOKEN REGISTRATION */
-
-async function sendTokenToWorker(token){
-const response=await fetch(REGISTER_ENDPOINT,{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({token})
-});
-
-if(!response.ok){
-const errorText=await response.text();
-throw new Error("Token registration failed: "+
-response.status+" "+errorText);
-}
-
-return await response.json().catch(()=>({success:true}));
-}
-
-/* ENABLE NOTIFICATIONS */
+    <img
+      src="./icons/icon-512.png"
+      alt="Story Za Dully"
+    >
 
-let notificationBusy=false;
+    <h2>STORY ZA DULLY</h2>
 
-notificationButton.addEventListener("click",async()=>{
-if(notificationBusy)return;
+  </div>
 
-notificationBusy=true;
-notificationButton.disabled=true;
 
-try{
-if(!("Notification" in window)){
-throw new Error("Browser hii haitumii notifications.");
-}
-
-if(!("serviceWorker" in navigator)){
-throw new Error("Service Worker haipatikani.");
-}
-
-if(!navigator.onLine){
-throw new Error("Washa internet kisha jaribu tena.");
-}
-
-if(Notification.permission==="denied"){
-throw new Error("Notifications zimezuiwa. Ruhusu kupitia mipangilio ya browser.");
-}
-
-let permission=Notification.permission;
-
-if(permission!=="granted"){
-permission=await Notification.requestPermission();
-}
-
-if(permission!=="granted"){
-throw new Error("Hujaruhusu notifications.");
-}
-
-await registerServiceWorker();
-await initializeFirebase();
-
-const token=await messaging.getToken({
-vapidKey:VAPID_PUBLIC_KEY,
-serviceWorkerRegistration:swRegistration
-});
-
-if(!token){
-throw new Error("Firebase haijatoa FCM token.");
-}
-
-const result=await sendTokenToWorker(token);
-
-if(result.success===false){
-throw new Error("Worker haikukubali usajili wa token.");
-}
-
-console.log("FCM registration result:",result);
-
-showToast("Notifications zimewashwa kikamilifu!");
-notificationButton.textContent="✓ NOTIFICATIONS ZIMEWASHWA";
-
-}catch(error){
-console.error("FCM ERROR:",error);
-showToast(error.message||"Imeshindikana kuwasha notifications.");
-}finally{
-notificationBusy=false;
-notificationButton.disabled=false;
-}
-});
-
-/* INITIAL SERVICE WORKER */
-
-window.addEventListener("load",async()=>{
-try{
-await registerServiceWorker();
-console.log("Story Za Dully Service Worker Ready");
-}catch(error){
-console.error("Service Worker Error:",error);
-}
-});
-
-/* INTERNET STATUS */
-
-function checkInternet(){
-networkStatus.style.display=navigator.onLine?"none":"block";
-}
-
-window.addEventListener("offline",()=>{
-networkStatus.style.display="block";
-});
-
-window.addEventListener("online",()=>{
-networkStatus.style.display="none";
-showToast("Internet Connection Restored");
-});
-
-checkInternet();
-
-/* BACK BUTTON */
-
-let lastBackPress=0;
-
-history.pushState({exitGuard:true},"",location.href);
-
-window.addEventListener("popstate",()=>{
-const now=Date.now();
-
-if(now-lastBackPress<2000){
-lastBackPress=0;
-history.back();
-}else{
-lastBackPress=now;
-showToast("Tap again to exit");
-history.pushState({exitGuard:true},"",location.href);
-}
-});
-</script>
+  <!-- INTERNET STATUS -->
+  <div id="networkStatus">
+    No Internet Connection
+  </div>
+
+
+  <!-- TOAST -->
+  <div id="toast"></div>
+
+
+  <!-- INSTALL APP -->
+  <div id="installBox">
+
+    <h3>INSTALL STORY ZA DULLY</h3>
+
+    <button id="installButton">
+      INSTALL APP
+    </button>
+
+    <div id="installHelp">
+      Kama popup haipatikani, fungua menyu ya Chrome
+      kisha chagua Install app au Add to Home screen,
+      ikiwa chaguo hilo linapatikana.
+    </div>
+
+  </div>
+
+
+  <!-- BLOGGER WEBSITE -->
+  <iframe
+    id="blog"
+    src="https://dullystory.blogspot.com/"
+    title="Story Za Dully">
+  </iframe>
+
+
+  <script>
+
+    /* SERVICE WORKER */
+    if ("serviceWorker" in navigator) {
+
+      window.addEventListener("load", function () {
+
+        navigator.serviceWorker
+          .register("./service-worker.js")
+          .catch(function (error) {
+            console.error("Service Worker:", error);
+          });
+
+      });
+
+    }
+
+
+    /* SPLASH SCREEN */
+    const splash = document.getElementById("splash");
+
+    const blog = document.getElementById("blog");
+
+    function hideSplash() {
+      splash.classList.add("hide");
+    }
+
+    blog.addEventListener("load", function () {
+
+      setTimeout(hideSplash, 500);
+
+    });
+
+    // Fallback ikiwa Blogger itachelewa kufunguka
+    setTimeout(hideSplash, 10000);
+
+
+    /* TOAST MESSAGE */
+    const toast = document.getElementById("toast");
+
+    let toastTimer;
+
+    function showToast(message) {
+
+      toast.textContent = message;
+
+      toast.classList.add("show");
+
+      clearTimeout(toastTimer);
+
+      toastTimer = setTimeout(function () {
+
+        toast.classList.remove("show");
+
+      }, 2500);
+
+    }
+
+
+    /* INTERNET CONNECTION */
+    const networkStatus =
+      document.getElementById("networkStatus");
+
+    function checkInternet() {
+
+      networkStatus.style.display =
+        navigator.onLine ? "none" : "block";
+
+    }
+
+    window.addEventListener("offline", function () {
+
+      networkStatus.style.display = "block";
+
+    });
+
+    window.addEventListener("online", function () {
+
+      networkStatus.style.display = "none";
+
+      showToast("Internet Connection Restored");
+
+    });
+
+    checkInternet();
+
+
+    /* PWA INSTALLATION */
+    let deferredInstallPrompt = null;
+
+    const installBox =
+      document.getElementById("installBox");
+
+    const installButton =
+      document.getElementById("installButton");
+
+    const installHelp =
+      document.getElementById("installHelp");
+
+
+    // Kama app tayari imesakinishwa, usionyeshe install
+    function checkInstalled() {
+
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches;
+
+      const androidApp =
+        window.navigator.standalone === true;
+
+      if (standalone || androidApp) {
+
+        installBox.style.display = "none";
+
+        return true;
+
+      }
+
+      return false;
+
+    }
+
+
+    // Chrome ikiruhusu kusakinisha
+    window.addEventListener(
+      "beforeinstallprompt",
+      function (event) {
+
+        event.preventDefault();
+
+        deferredInstallPrompt = event;
+
+        if (!checkInstalled()) {
+
+          installBox.style.display = "block";
+
+          installHelp.style.display = "none";
+
+        }
+
+      }
+    );
+
+
+    // Mtumiaji akibonyeza INSTALL APP
+    installButton.addEventListener("click", async function () {
+
+      if (deferredInstallPrompt) {
+
+        deferredInstallPrompt.prompt();
+
+        const result =
+          await deferredInstallPrompt.userChoice;
+
+        deferredInstallPrompt = null;
+
+        installBox.style.display = "none";
+
+        if (result.outcome === "accepted") {
+
+          showToast("Installation Started");
+
+        }
+
+      } else {
+
+        installHelp.style.display = "block";
+
+        showToast("Angalia maelekezo ya kusakinisha");
+
+      }
+
+    });
+
+
+    // App ikishasakinishwa
+    window.addEventListener("appinstalled", function () {
+
+      installBox.style.display = "none";
+
+      deferredInstallPrompt = null;
+
+      showToast("Story Za Dully Installed!");
+
+    });
+
+
+    // Usionyeshe kitufe kama tayari imesakinishwa
+    checkInstalled();
+
+
+    /* BACK BUTTON */
+    let lastBackPress = 0;
+
+    history.pushState(
+      { exitGuard: true },
+      "",
+      location.href
+    );
+
+    window.addEventListener("popstate", function () {
+
+      const now = Date.now();
+
+      if (now - lastBackPress < 2000) {
+
+        lastBackPress = 0;
+
+        history.back();
+
+      } else {
+
+        lastBackPress = now;
+
+        showToast("Tap again to exit");
+
+        history.pushState(
+          { exitGuard: true },
+          "",
+          location.href
+        );
+
+      }
+
+    });
+
+  </script>
+
 </body>
 </html>
