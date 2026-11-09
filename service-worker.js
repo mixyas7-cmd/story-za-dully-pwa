@@ -1,4 +1,4 @@
-const CACHE_NAME = "story-za-dully-v5";
+const CACHE_NAME = "story-za-dully-v4";
 
 const FILES_TO_CACHE = [
   "/story-za-dully-pwa/",
