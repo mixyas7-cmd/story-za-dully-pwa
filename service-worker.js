@@ -1,4 +1,4 @@
-const CACHE_NAME = "story-za-dully-v4";
+const CACHE_NAME = "story-za-dully-v5";
 
 const FILES_TO_CACHE = [
   "/story-za-dully-pwa/",
@@ -41,12 +41,10 @@ self.addEventListener("fetch", (event) => {
 
   const request = event.request;
 
-  // Hifadhi GET requests pekee
   if (request.method !== "GET") {
     return;
   }
 
-  // Usihifadhi maombi ya Blogger au tovuti nyingine
   const requestURL = new URL(request.url);
 
   if (requestURL.origin !== self.location.origin) {
