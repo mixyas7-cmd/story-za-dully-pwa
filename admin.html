@@ -1,328 +1,380 @@
-const enc = new TextEncoder();
-const BATCH = 20;
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type"
-};
-
-function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { "Content-Type": "application/json", ...CORS }
-  });
-}
-
-function b64url(input) {
-  const bytes = typeof input === "string"
-    ? enc.encode(input) : new Uint8Array(input);
-  let s = "";
-  bytes.forEach((b) => (s += String.fromCharCode(b)));
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-let cachedToken = null;
-let cachedExp = 0;
-
-async function getAccessToken(sa) {
-  if (cachedToken && Date.now() < cachedExp) return cachedToken;
-
-  const now = Math.floor(Date.now() / 1000);
-  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = b64url(JSON.stringify({
-    iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging",
-    aud: "https://oauth2.googleapis.com/token",
-    iat: now,
-    exp: now + 3600
-  }));
-
-  const pem = sa.private_key
-    .replace(/-----[^-]+-----/g, "")
-    .replace(/\s+/g, "");
-  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
-
-  const key = await crypto.subtle.importKey(
-    "pkcs8", der.buffer,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5", key, enc.encode(header + "." + claim)
-  );
-  const jwt = header + "." + claim + "." + b64url(sig);
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: "grant_type=" +
-      encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer") +
-      "&assertion=" + jwt
-  });
-  const data = await res.json();
-  if (!data.access_token) throw new Error("Auth ya Google imeshindwa");
-
-  cachedToken = data.access_token;
-  cachedExp = Date.now() + 50 * 60 * 1000;
-  return cachedToken;
-}
-
-function fsBase(pid) {
-  return "https://firestore.googleapis.com/v1/projects/" + pid +
-    "/databases/(default)/documents";
-}
-
-async function listTokens(pid, accessToken) {
-  const tokens = [];
-  let pageToken = "";
-  do {
-    const url = fsBase(pid) + "/tokens?pageSize=300" +
-      (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : "");
-    const res = await fetch(url, {
-      headers: { Authorization: "Bearer " + accessToken }
-    });
-    const data = await res.json();
-    if (data.error) throw new Error("Firestore: " + data.error.message);
-    (data.documents || []).forEach((d) => {
-      const t = d.fields && d.fields.token && d.fields.token.stringValue;
-      if (t) tokens.push(t);
-    });
-    pageToken = data.nextPageToken || "";
-  } while (pageToken);
-  return tokens;
-}
-
-async function createMessage(pid, accessToken, id, title, body, total) {
-  const zero = { integerValue: "0" };
-  const res = await fetch(fsBase(pid) + "/messages/" + id, {
-    method: "PATCH",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      fields: {
-        title: { stringValue: title },
-        body: { stringValue: body },
-        createdAt: { timestampValue: new Date().toISOString() },
-        total: { integerValue: String(total) },
-        sent: zero,
-        delivered: zero,
-        opened: zero
-      }
-    })
-  });
-  if (!res.ok) throw new Error("Imeshindwa kuhifadhi historia");
-}
-
-async function increment(pid, accessToken, id, field, n) {
-  if (!n) return;
-  await fetch(fsBase(pid) + ":commit", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      writes: [{
-        currentDocument: { exists: true },
-        transform: {
-          document: "projects/" + pid +
-            "/databases/(default)/documents/messages/" + id,
-          fieldTransforms: [{
-            fieldPath: field,
-            increment: { integerValue: String(n) }
-          }]
-        }
-      }]
-    })
-  });
-}
-
-async function listMessages(pid, accessToken) {
-  const res = await fetch(
-    fsBase(pid) + "/messages?pageSize=30&orderBy=" +
-      encodeURIComponent("createdAt desc"),
-    { headers: { Authorization: "Bearer " + accessToken } }
-  );
-  const data = await res.json();
-  if (data.error) throw new Error("Firestore: " + data.error.message);
-
-  const num = (f) => parseInt((f && f.integerValue) || "0", 10);
-  return (data.documents || []).map((d) => {
-    const f = d.fields || {};
-    return {
-      id: d.name.split("/").pop(),
-      title: (f.title && f.title.stringValue) || "",
-      body: (f.body && f.body.stringValue) || "",
-      createdAt: (f.createdAt && f.createdAt.timestampValue) || "",
-      total: num(f.total),
-      sent: num(f.sent),
-      delivered: num(f.delivered),
-      opened: num(f.opened)
-    };
-  });
-}
-
-async function deleteMessage(pid, accessToken, id) {
-  const res = await fetch(fsBase(pid) + "/messages/" + id, {
-    method: "DELETE",
-    headers: { Authorization: "Bearer " + accessToken }
-  });
-  if (!res.ok) throw new Error("Imeshindwa kufuta");
-}
-
-const ID_OK = /^[a-z0-9]{6,40}$/;
-
-export default {
-  async fetch(request, env) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS });
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin - Story Za Dully</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #050816;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
     }
-    if (request.method !== "POST") {
-      return new Response("Dully Notify OK", { headers: CORS });
+    .box { max-width: 460px; margin: 0 auto; }
+    h1 { font-size: 20px; text-align: center; }
+    h2 { font-size: 16px; margin: 32px 0 12px; }
+    label { display: block; margin: 16px 0 6px; font-size: 13px; color: #b8bdca; }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #333a55;
+      background: #0d1226;
+      color: #ffffff;
+      font-size: 15px;
+      font-family: Arial, sans-serif;
     }
-
-    const path = new URL(request.url).pathname;
-
-    let input;
-    try {
-      input = await request.json();
-    } catch (e) {
-      return json({ error: "Data si sahihi" }, 400);
+    textarea { min-height: 200px; resize: vertical; line-height: 1.5; }
+    .pass-wrap { position: relative; }
+    .pass-wrap input { padding-right: 52px; }
+    #eye {
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      width: 44px;
+      height: 44px;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      color: #ffffff;
+      font-size: 20px;
+      border-radius: 8px;
     }
-
-    let sa, pid;
-    try {
-      sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
-      pid = sa.project_id;
-    } catch (e) {
-      return json({ error: "Secret ya Firebase si sahihi" }, 500);
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 0;
+      font-size: 13px;
+      color: #b8bdca;
     }
+    .remember input { width: auto; margin: 0; }
+    .counter { text-align: right; font-size: 12px; color: #8a91a8; margin-top: 4px; }
+    button {
+      width: 100%;
+      margin-top: 22px;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #050816;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; }
+    #status {
+      margin-top: 18px;
+      font-size: 14px;
+      line-height: 1.6;
+      text-align: center;
+      white-space: pre-line;
+    }
+    #refresh {
+      margin-top: 0;
+      padding: 8px 14px;
+      width: auto;
+      font-size: 12px;
+      background: #1a2140;
+      color: #ffffff;
+    }
+    .head { display: flex; justify-content: space-between; align-items: center; }
+    .head h2 { margin: 32px 0 12px; }
+    .head button { margin-top: 20px; }
+    .msg {
+      background: #0d1226;
+      border: 1px solid #333a55;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .msg .t { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
+    .msg .b { font-size: 13px; color: #b8bdca; line-height: 1.5; white-space: pre-line; }
+    .msg .d { font-size: 11px; color: #8a91a8; margin: 8px 0 10px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .stat {
+      background: #050816;
+      border-radius: 8px;
+      padding: 8px 4px;
+      text-align: center;
+    }
+    .stat .n { font-size: 18px; font-weight: bold; }
+    .stat .l { font-size: 10px; color: #8a91a8; margin-top: 2px; }
+    .del {
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid #5a2a35;
+      color: #ff7b8a;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+    #empty { text-align: center; color: #8a91a8; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Tuma Notification</h1>
 
-    /* KUFUATILIA: delivered / opened (inatoka kwa simu) */
-    if (path === "/track") {
-      const id = String(input.id || "");
-      const type = String(input.type || "");
-      if (!ID_OK.test(id) || (type !== "delivered" && type !== "opened")) {
-        return json({ error: "Data si sahihi" }, 400);
-      }
+    <label>Password ya admin</label>
+    <div class="pass-wrap">
+      <input type="password" id="password" autocomplete="current-password">
+      <button type="button" id="eye" aria-label="Onyesha password">👁</button>
+    </div>
+    <label class="remember">
+      <input type="checkbox" id="remember">
+      Nikumbuke kwenye simu hii
+    </label>
+
+    <label>Kichwa (title)</label>
+    <input type="text" id="title" maxlength="100">
+
+    <label>Ujumbe</label>
+    <textarea id="body" maxlength="300"></textarea>
+    <div class="counter"><span id="count">0</span>/300</div>
+
+    <label>Link (si lazima)</label>
+    <input type="text" id="url" placeholder="Acha tupu kufungua app">
+
+    <button id="send">TUMA SASA</button>
+    <div id="status"></div>
+
+    <div class="head">
+      <h2>Historia</h2>
+      <button type="button" id="refresh">Sasisha</button>
+    </div>
+    <div id="history"><div id="empty">Weka password kuona historia.</div></div>
+  </div>
+
+  <script>
+    const WORKER_URL = "https://dully-notify.dullyofficial2000.workers.dev";
+    const PASS_KEY = "dullyAdminPass";
+
+    const passInput = document.getElementById("password");
+    const eyeBtn = document.getElementById("eye");
+    const rememberBox = document.getElementById("remember");
+    const bodyInput = document.getElementById("body");
+    const sendBtn = document.getElementById("send");
+    const statusBox = document.getElementById("status");
+    const historyBox = document.getElementById("history");
+
+    /* KUMBUKA PASSWORD */
+    function savePass() {
       try {
-        const at = await getAccessToken(sa);
-        await increment(pid, at, id, type, 1);
-        return json({ ok: true });
-      } catch (e) {
-        return json({ error: e.message }, 500);
-      }
+        if (rememberBox.checked && passInput.value) {
+          localStorage.setItem(PASS_KEY, passInput.value);
+        } else {
+          localStorage.removeItem(PASS_KEY);
+        }
+      } catch (e) {}
     }
 
-    /* Hapa chini ni kwa admin tu: inahitaji password */
-    if (!env.ADMIN_PASSWORD || input.password !== env.ADMIN_PASSWORD) {
-      return json({ error: "Password si sahihi" }, 401);
+    try {
+      const saved = localStorage.getItem(PASS_KEY);
+      if (saved) {
+        passInput.value = saved;
+        rememberBox.checked = true;
+      }
+    } catch (e) {}
+
+    rememberBox.addEventListener("change", savePass);
+
+    /* JICHO */
+    eyeBtn.addEventListener("click", function () {
+      const hidden = passInput.type === "password";
+      passInput.type = hidden ? "text" : "password";
+      eyeBtn.textContent = hidden ? "🙈" : "👁";
+    });
+
+    /* IDADI YA HERUFI */
+    bodyInput.addEventListener("input", function () {
+      document.getElementById("count").textContent = bodyInput.value.length;
+    });
+
+    async function callWorker(path, payload) {
+      const res = await fetch(WORKER_URL + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Hitilafu");
+      return data;
+    }
+
+    function makeStat(num, label) {
+      const s = document.createElement("div");
+      s.className = "stat";
+      const n = document.createElement("div");
+      n.className = "n";
+      n.textContent = num;
+      const l = document.createElement("div");
+      l.className = "l";
+      l.textContent = label;
+      s.appendChild(n);
+      s.appendChild(l);
+      return s;
+    }
+
+    /* FUTA UJUMBE */
+    async function deleteMsg(id, title) {
+      const sure = confirm(
+        "Futa ujumbe huu?\n\n" + title +
+        "\n\nHistoria na idadi zake zitafutwa kabisa."
+      );
+      if (!sure) return;
+
+      try {
+        await callWorker("/delete", {
+          password: passInput.value,
+          id: id
+        });
+        loadHistory();
+      } catch (e) {
+        alert("Imeshindwa kufuta: " + e.message);
+      }
     }
 
     /* HISTORIA */
-    if (path === "/history") {
+    async function loadHistory() {
+      const password = passInput.value;
+      if (!password) return;
+
       try {
-        const at = await getAccessToken(sa);
-        return json({ messages: await listMessages(pid, at) });
+        const r = await callWorker("/history", { password: password });
+        savePass();
+        historyBox.textContent = "";
+
+        if (!r.messages.length) {
+          const e = document.createElement("div");
+          e.id = "empty";
+          e.textContent = "Bado hakuna ujumbe uliotumwa.";
+          historyBox.appendChild(e);
+          return;
+        }
+
+        r.messages.forEach(function (m) {
+          const card = document.createElement("div");
+          card.className = "msg";
+
+          const t = document.createElement("div");
+          t.className = "t";
+          t.textContent = m.title;
+
+          const b = document.createElement("div");
+          b.className = "b";
+          b.textContent = m.body;
+
+          const d = document.createElement("div");
+          d.className = "d";
+          d.textContent = m.createdAt
+            ? new Date(m.createdAt).toLocaleString() : "";
+
+          const stats = document.createElement("div");
+          stats.className = "stats";
+          stats.appendChild(makeStat(m.total, "Walengwa"));
+          stats.appendChild(makeStat(m.sent, "Zimetumwa"));
+          stats.appendChild(makeStat(m.delivered, "Zimefika"));
+          stats.appendChild(makeStat(m.opened, "Wamefungua"));
+
+          const del = document.createElement("button");
+          del.type = "button";
+          del.className = "del";
+          del.textContent = "🗑 Futa";
+          del.addEventListener("click", function () {
+            deleteMsg(m.id, m.title);
+          });
+
+          card.appendChild(t);
+          card.appendChild(b);
+          card.appendChild(d);
+          card.appendChild(stats);
+          card.appendChild(del);
+          historyBox.appendChild(card);
+        });
       } catch (e) {
-        return json({ error: e.message }, 500);
+        historyBox.textContent = "";
+        const err = document.createElement("div");
+        err.id = "empty";
+        err.textContent = "Historia: " + e.message;
+        historyBox.appendChild(err);
       }
     }
 
-    /* FUTA */
-    if (path === "/delete") {
-      const delId = String(input.id || "");
-      if (!ID_OK.test(delId)) {
-        return json({ error: "Data si sahihi" }, 400);
-      }
-      try {
-        const at = await getAccessToken(sa);
-        await deleteMessage(pid, at, delId);
-        return json({ ok: true });
-      } catch (e) {
-        return json({ error: e.message }, 500);
-      }
-    }
+    document.getElementById("refresh")
+      .addEventListener("click", loadHistory);
+
+    passInput.addEventListener("change", loadHistory);
+
+    /* Jisasishe kila sekunde 10 */
+    setInterval(function () {
+      if (!document.hidden) loadHistory();
+    }, 10000);
+
+    /* Fungua historia moja kwa moja kama password imekumbukwa */
+    loadHistory();
 
     /* KUTUMA */
-    const title = String(input.title || "").slice(0, 100);
-    const body = String(input.body || "").slice(0, 300);
-    const url = String(input.url || "/story-za-dully-pwa/");
-    const skip = parseInt(input.skip || 0, 10);
+    sendBtn.addEventListener("click", async function () {
+      const password = passInput.value;
+      const title = document.getElementById("title").value.trim();
+      const body = bodyInput.value.trim();
+      const url = document.getElementById("url").value.trim();
 
-    let id = String(input.id || "");
-    if (!ID_OK.test(id)) {
-      id = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-    }
-
-    if (!title || !body) {
-      return json({ error: "Weka kichwa na ujumbe" }, 400);
-    }
-
-    try {
-      const accessToken = await getAccessToken(sa);
-
-      const all = await listTokens(pid, accessToken);
-      const batch = all.slice(skip, skip + BATCH);
-
-      if (skip === 0) {
-        await createMessage(pid, accessToken, id, title, body, all.length);
+      if (!password || !title || !body) {
+        statusBox.textContent = "Jaza password, kichwa na ujumbe.";
+        return;
       }
 
+      sendBtn.disabled = true;
+
+      const id = Math.random().toString(36).slice(2, 10) +
+        Date.now().toString(36);
+
+      let skip = 0;
       let sent = 0;
       let failed = 0;
-      let deleted = 0;
+      let ok = false;
 
-      await Promise.all(batch.map(async (token) => {
-        const res = await fetch(
-          "https://fcm.googleapis.com/v1/projects/" + pid + "/messages:send",
-          {
-            method: "POST",
-            headers: {
-              Authorization: "Bearer " + accessToken,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              message: {
-                token: token,
-                data: { title: title, body: body, url: url, id: id },
-                webpush: { headers: { Urgency: "high", TTL: "86400" } }
-              }
-            })
-          }
-        );
+      try {
+        while (skip !== null) {
+          statusBox.textContent = "Inatuma... (zimetumwa " + sent + ")";
+          const payload = {
+            password: password,
+            title: title,
+            body: body,
+            skip: skip,
+            id: id
+          };
+          if (url) payload.url = url;
 
-        if (res.ok) {
-          sent++;
-        } else {
-          failed++;
-          if (res.status === 404) {
-            deleted++;
-            await fetch(
-              fsBase(pid) + "/tokens/" + encodeURIComponent(token),
-              { method: "DELETE", headers: { Authorization: "Bearer " + accessToken } }
-            );
-          }
+          const r = await callWorker("/", payload);
+          sent += r.sent;
+          failed += r.failed;
+          skip = r.next;
         }
-      }));
+        ok = true;
+        statusBox.textContent =
+          "Imekamilika ✅\nZimetumwa: " + sent + "\nZimeshindwa: " + failed;
+      } catch (e) {
+        statusBox.textContent = "Hitilafu: " + e.message;
+      }
 
-      await increment(pid, accessToken, id, "sent", sent);
+      if (ok) {
+        document.getElementById("title").value = "";
+        document.getElementById("url").value = "";
+        bodyInput.value = "";
+        document.getElementById("count").textContent = "0";
+      }
 
-      const nextSkip = skip + batch.length - deleted;
-      const hasMore = skip + batch.length < all.length;
-
-      return json({
-        id: id,
-        total: all.length,
-        sent: sent,
-        failed: failed,
-        next: hasMore ? nextSkip : null
-      });
-    } catch (e) {
-      return json({ error: e.message }, 500);
-    }
-  }
-};
+      sendBtn.disabled = false;
+      loadHistory();
+    });
+  </script>
+</body>
+</html>
