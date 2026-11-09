@@ -86,4 +86,216 @@
     .msg .t { font-weight: bold; font-size: 15px; margin-bottom: 4px; }
     .msg .b { font-size: 13px; color: #b8bdca; line-height: 1.5; white-space: pre-line; }
     .msg .d { font-size: 11px; color: #8a91a8; margin: 8px 0 10px; }
-    .stats { display: grid; grid-template-columns: repeat(4,
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .stat {
+      background: #050816;
+      border-radius: 8px;
+      padding: 8px 4px;
+      text-align: center;
+    }
+    .stat .n { font-size: 18px; font-weight: bold; }
+    .stat .l { font-size: 10px; color: #8a91a8; margin-top: 2px; }
+    #empty { text-align: center; color: #8a91a8; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Tuma Notification</h1>
+
+    <label>Password ya admin</label>
+    <div class="pass-wrap">
+      <input type="password" id="password" autocomplete="current-password">
+      <button type="button" id="eye" aria-label="Onyesha password">👁</button>
+    </div>
+
+    <label>Kichwa (title)</label>
+    <input type="text" id="title" maxlength="100">
+
+    <label>Ujumbe</label>
+    <textarea id="body" maxlength="300"></textarea>
+    <div class="counter"><span id="count">0</span>/300</div>
+
+    <label>Link (si lazima)</label>
+    <input type="text" id="url" placeholder="Acha tupu kufungua app">
+
+    <button id="send">TUMA SASA</button>
+    <div id="status"></div>
+
+    <div class="head">
+      <h2>Historia</h2>
+      <button type="button" id="refresh">Sasisha</button>
+    </div>
+    <div id="history"><div id="empty">Weka password kuona historia.</div></div>
+  </div>
+
+  <script>
+    const WORKER_URL = "https://dully-notify.dullyofficial2000.workers.dev";
+
+    const passInput = document.getElementById("password");
+    const eyeBtn = document.getElementById("eye");
+    const bodyInput = document.getElementById("body");
+    const sendBtn = document.getElementById("send");
+    const statusBox = document.getElementById("status");
+    const historyBox = document.getElementById("history");
+
+    /* JICHO */
+    eyeBtn.addEventListener("click", function () {
+      const hidden = passInput.type === "password";
+      passInput.type = hidden ? "text" : "password";
+      eyeBtn.textContent = hidden ? "🙈" : "👁";
+    });
+
+    /* IDADI YA HERUFI */
+    bodyInput.addEventListener("input", function () {
+      document.getElementById("count").textContent = bodyInput.value.length;
+    });
+
+    async function callWorker(path, payload) {
+      const res = await fetch(WORKER_URL + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Hitilafu");
+      return data;
+    }
+
+    function makeStat(num, label) {
+      const s = document.createElement("div");
+      s.className = "stat";
+      const n = document.createElement("div");
+      n.className = "n";
+      n.textContent = num;
+      const l = document.createElement("div");
+      l.className = "l";
+      l.textContent = label;
+      s.appendChild(n);
+      s.appendChild(l);
+      return s;
+    }
+
+    /* HISTORIA */
+    async function loadHistory() {
+      const password = passInput.value;
+      if (!password) return;
+
+      try {
+        const r = await callWorker("/history", { password: password });
+        historyBox.textContent = "";
+
+        if (!r.messages.length) {
+          const e = document.createElement("div");
+          e.id = "empty";
+          e.textContent = "Bado hakuna ujumbe uliotumwa.";
+          historyBox.appendChild(e);
+          return;
+        }
+
+        r.messages.forEach(function (m) {
+          const card = document.createElement("div");
+          card.className = "msg";
+
+          const t = document.createElement("div");
+          t.className = "t";
+          t.textContent = m.title;
+
+          const b = document.createElement("div");
+          b.className = "b";
+          b.textContent = m.body;
+
+          const d = document.createElement("div");
+          d.className = "d";
+          d.textContent = m.createdAt
+            ? new Date(m.createdAt).toLocaleString() : "";
+
+          const stats = document.createElement("div");
+          stats.className = "stats";
+          stats.appendChild(makeStat(m.total, "Walengwa"));
+          stats.appendChild(makeStat(m.sent, "Zimetumwa"));
+          stats.appendChild(makeStat(m.delivered, "Zimefika"));
+          stats.appendChild(makeStat(m.opened, "Wamefungua"));
+
+          card.appendChild(t);
+          card.appendChild(b);
+          card.appendChild(d);
+          card.appendChild(stats);
+          historyBox.appendChild(card);
+        });
+      } catch (e) {
+        historyBox.textContent = "";
+        const err = document.createElement("div");
+        err.id = "empty";
+        err.textContent = "Historia: " + e.message;
+        historyBox.appendChild(err);
+      }
+    }
+
+    document.getElementById("refresh")
+      .addEventListener("click", loadHistory);
+
+    passInput.addEventListener("change", loadHistory);
+
+    setInterval(function () {
+      if (!document.hidden) loadHistory();
+    }, 10000);
+
+    /* KUTUMA */
+    sendBtn.addEventListener("click", async function () {
+      const password = passInput.value;
+      const title = document.getElementById("title").value.trim();
+      const body = bodyInput.value.trim();
+      const url = document.getElementById("url").value.trim();
+
+      if (!password || !title || !body) {
+        statusBox.textContent = "Jaza password, kichwa na ujumbe.";
+        return;
+      }
+
+      sendBtn.disabled = true;
+
+      const id = Math.random().toString(36).slice(2, 10) +
+        Date.now().toString(36);
+
+      let skip = 0;
+      let sent = 0;
+      let failed = 0;
+      let ok = false;
+
+      try {
+        while (skip !== null) {
+          statusBox.textContent = "Inatuma... (zimetumwa " + sent + ")";
+          const payload = {
+            password: password,
+            title: title,
+            body: body,
+            skip: skip,
+            id: id
+          };
+          if (url) payload.url = url;
+
+          const r = await callWorker("/", payload);
+          sent += r.sent;
+          failed += r.failed;
+          skip = r.next;
+        }
+        ok = true;
+        statusBox.textContent =
+          "Imekamilika ✅\nZimetumwa: " + sent + "\nZimeshindwa: " + failed;
+      } catch (e) {
+        statusBox.textContent = "Hitilafu: " + e.message;
+      }
+
+      if (ok) {
+        document.getElementById("title").value = "";
+        document.getElementById("url").value = "";
+        bodyInput.value = "";
+        document.getElementById("count").textContent = "0";
+      }
+
+      sendBtn.disabled = false;
+      loadHistory();
+    });
+  </script>
+</body>
+</html>
