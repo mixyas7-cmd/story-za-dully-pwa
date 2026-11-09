@@ -1,4 +1,4 @@
-const CACHE_NAME = "story-za-dully-v6";
+const CACHE_NAME = "story-za-dully-v7";
 
 const TRACK_URL = "https://dully-notify.dullyofficial2000.workers.dev/track";
 
@@ -141,7 +141,21 @@ self.addEventListener("notificationclick", (event) => {
   const info = event.notification.data || {};
   const targetUrl = info.url || "/story-za-dully-pwa/";
 
-  const openApp = clients
-    .matchAll({ type: "window", includeUncontrolled: true })
-    .then((list) => {
-      for (const client of list) {
+  /* 1. Ripoti kwanza, peke yake */
+  event.waitUntil(track(info.id, "opened"));
+
+  /* 2. Fungua app, hitilafu yoyote isiathiri ripoti */
+  event.waitUntil(
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((list) => {
+        for (const client of list) {
+          if (client.url.includes("/story-za-dully-pwa/") && "focus" in client) {
+            return client.focus();
+          }
+        }
+        return clients.openWindow(targetUrl);
+      })
+      .catch(() => {})
+  );
+});
