@@ -1,4 +1,6 @@
-const CACHE_NAME = "story-za-dully-v5";
+const CACHE_NAME = "story-za-dully-v6";
+
+const TRACK_URL = "https://dully-notify.dullyofficial2000.workers.dev/track";
 
 const FILES_TO_CACHE = [
   "/story-za-dully-pwa/",
@@ -91,6 +93,18 @@ self.addEventListener("fetch", (event) => {
 
 });
 
+/* RIPOTI: delivered / opened */
+function track(id, type) {
+  if (!id) return Promise.resolve();
+
+  return fetch(TRACK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id, type: type }),
+    keepalive: true
+  }).catch(() => {});
+}
+
 /* PUSH NOTIFICATION */
 self.addEventListener("push", (event) => {
   let payload = {};
@@ -106,25 +120,28 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "",
     icon: iconUrl,
-    data: { url: data.url || "/story-za-dully-pwa/" }
+    data: {
+      url: data.url || "/story-za-dully-pwa/",
+      id: data.id || ""
+    }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      track(data.id, "delivered")
+    ])
+  );
 });
 
 /* BONYEZA NOTIFICATION */
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data.url;
 
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+  const info = event.notification.data || {};
+  const targetUrl = info.url || "/story-za-dully-pwa/";
+
+  const openApp = clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then((list) => {
       for (const client of list) {
-        if (client.url.includes("/story-za-dully-pwa/") && "focus" in client) {
-          return client.focus();
-        }
-      }
-      return clients.openWindow(targetUrl);
-    })
-  );
-});
