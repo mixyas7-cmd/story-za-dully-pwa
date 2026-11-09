@@ -18,9 +18,7 @@
         href="./icons/icon-512.png">
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -32,7 +30,6 @@
       font-family: Arial, sans-serif;
     }
 
-    /* BLOGGER */
     #blog {
       width: 100%;
       height: 100%;
@@ -42,7 +39,6 @@
       background: #050816;
     }
 
-    /* INSTALL PAGE */
     #installPage {
       position: fixed;
       inset: 0;
@@ -74,7 +70,7 @@
     }
 
     #installTitle {
-      color: #ffffff;
+      color: #fff;
       font-size: 19px;
       font-weight: bold;
       letter-spacing: 1.2px;
@@ -89,7 +85,6 @@
       max-width: 290px;
     }
 
-    /* INSTALL BUTTON */
     #installButton {
       position: relative;
       overflow: hidden;
@@ -98,7 +93,7 @@
       padding: 16px 20px;
       border: none;
       border-radius: 10px;
-      background: #ffffff;
+      background: #fff;
       color: #050816;
       font-size: 15px;
       font-weight: 800;
@@ -107,7 +102,6 @@
       box-shadow: 0 5px 22px rgba(255,255,255,0.10);
     }
 
-    /* SHIMMER EFFECT */
     #installButton::before {
       content: "";
       position: absolute;
@@ -127,13 +121,8 @@
     }
 
     @keyframes shimmer {
-      0% {
-        left: -120%;
-      }
-
-      45%, 100% {
-        left: 150%;
-      }
+      0% { left: -120%; }
+      45%, 100% { left: 150%; }
     }
 
     #installButton:active {
@@ -161,7 +150,6 @@
       cursor: pointer;
     }
 
-    /* NETWORK MESSAGE */
     #networkStatus {
       position: fixed;
       top: 12px;
@@ -178,13 +166,12 @@
       white-space: nowrap;
     }
 
-    /* TOAST */
     #toast {
       position: fixed;
       bottom: 35px;
       left: 50%;
       transform: translate(-50%, 20px);
-      z-index: 10002;
+      z-index: 10005;
       background: #292929;
       color: white;
       padding: 13px 22px;
@@ -194,12 +181,35 @@
       visibility: hidden;
       transition: .25s ease;
       white-space: nowrap;
+      max-width: 90%;
+      text-align: center;
     }
 
     #toast.show {
       opacity: 1;
       visibility: visible;
       transform: translate(-50%, 0);
+    }
+
+    /* PUSH NOTIFICATION BUTTON */
+    #notificationButton {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 10003;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: #151d35;
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+
+    #notificationButton:disabled {
+      opacity: 0.6;
     }
   </style>
 </head>
@@ -208,7 +218,6 @@
 
   <!-- INSTALL PAGE -->
   <div id="installPage">
-
     <div id="installContent">
 
       <img
@@ -251,6 +260,11 @@
     title="Story Za Dully">
   </iframe>
 
+  <!-- PUSH BUTTON -->
+  <button id="notificationButton" type="button">
+    🔔 WASHA NOTIFICATIONS
+  </button>
+
   <!-- NETWORK -->
   <div id="networkStatus">
     No Internet Connection
@@ -258,22 +272,41 @@
 
   <div id="toast"></div>
 
+  <!-- FIREBASE COMPAT SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
 
   <script>
 
-    /* SERVICE WORKER */
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", function () {
-        navigator.serviceWorker
-          .register("./service-worker.js")
-          .catch(function (error) {
-            console.error("Service Worker:", error);
-          });
-      });
-    }
+    /* =================================
+       STORY ZA DULLY CONFIGURATION
+    ================================= */
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
+      authDomain: "mfano-c0401.firebaseapp.com",
+      databaseURL: "https://mfano-c0401-default-rtdb.firebaseio.com",
+      projectId: "mfano-c0401",
+      storageBucket: "mfano-c0401.firebasestorage.app",
+      messagingSenderId: "322823059663",
+      appId: "1:322823059663:web:cc885bd9c5631987309fba",
+      measurementId: "G-W7H32ENGZK"
+    };
+
+    const VAPID_PUBLIC_KEY =
+      "BFEdvTtcVdO21MC7oTMnhBzgSeUfvIw5RSoLGP4gFIg_oDac4eyt3u353wCt7YEI_Vz74CXMW-y072a8-qhmREQ";
+
+    const WORKER_URL =
+      "https://dully-story-notifications.dullyofficial2000.workers.dev";
+
+    const REGISTER_ENDPOINT =
+      WORKER_URL + "/register-token";
 
 
-    /* ELEMENTS */
+    /* =================================
+       ELEMENTS
+    ================================= */
+
     const installPage =
       document.getElementById("installPage");
 
@@ -286,19 +319,45 @@
     const continueButton =
       document.getElementById("continueButton");
 
+    const notificationButton =
+      document.getElementById("notificationButton");
 
-    /* HIDE INSTALL PAGE */
+    const toast =
+      document.getElementById("toast");
+
+    const networkStatus =
+      document.getElementById("networkStatus");
+
+
+    /* =================================
+       TOAST
+    ================================= */
+
+    let toastTimer;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+
+      clearTimeout(toastTimer);
+
+      toastTimer = setTimeout(function () {
+        toast.classList.remove("show");
+      }, 3000);
+    }
+
+
+    /* =================================
+       INSTALLATION
+    ================================= */
+
     function openBlogger() {
       installPage.style.display = "none";
     }
 
-
-    /* CHECK IF APP IS ALREADY INSTALLED */
     function checkInstalled() {
       const standalone =
-        window.matchMedia(
-          "(display-mode: standalone)"
-        ).matches;
+        window.matchMedia("(display-mode: standalone)").matches;
 
       const androidApp =
         window.navigator.standalone === true;
@@ -311,24 +370,17 @@
       return false;
     }
 
-
-    /* INSTALL PROMPT */
     let deferredInstallPrompt = null;
 
     window.addEventListener(
       "beforeinstallprompt",
       function (event) {
-
         event.preventDefault();
-
         deferredInstallPrompt = event;
-
         installHelp.style.display = "none";
       }
     );
 
-
-    /* INSTALL BUTTON CLICK */
     installButton.addEventListener(
       "click",
       async function () {
@@ -343,22 +395,234 @@
           deferredInstallPrompt = null;
 
           if (result.outcome === "accepted") {
-
             showToast("Installation Started");
-
             openBlogger();
-
           } else {
-
             showToast("Installation Cancelled");
-
           }
 
         } else {
 
           installHelp.style.display = "block";
-
           continueButton.style.display = "block";
+
+        }
+      }
+    );
+
+    window.addEventListener("appinstalled", function () {
+      openBlogger();
+      deferredInstallPrompt = null;
+      showToast("Story Za Dully Installed!");
+    });
+
+    continueButton.addEventListener("click", openBlogger);
+
+    checkInstalled();
+
+
+    /* =================================
+       SERVICE WORKER REGISTRATION
+    ================================= */
+
+    let swRegistration = null;
+
+    async function registerServiceWorker() {
+
+      if (!("serviceWorker" in navigator)) {
+        throw new Error("Browser haitumii Service Worker.");
+      }
+
+      swRegistration =
+        await navigator.serviceWorker.register(
+          "./service-worker.js"
+        );
+
+      await navigator.serviceWorker.ready;
+
+      return swRegistration;
+    }
+
+
+    /* =================================
+       FIREBASE INITIALIZATION
+    ================================= */
+
+    let messaging = null;
+
+    let firebaseReady = false;
+
+    async function initializeFirebase() {
+
+      if (!window.firebase) {
+        throw new Error("Firebase SDK haijapakia.");
+      }
+
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+
+      const supported =
+        await firebase.messaging.isSupported();
+
+      if (!supported) {
+        throw new Error(
+          "Browser hii haitumii Firebase Messaging."
+        );
+      }
+
+      messaging = firebase.messaging();
+
+      firebaseReady = true;
+
+      messaging.onMessage(function (payload) {
+
+        const title =
+          payload.notification?.title ||
+          payload.data?.title ||
+          "Story Za Dully";
+
+        showToast("🔔 " + title);
+
+      });
+
+      return true;
+    }
+
+
+    /* =================================
+       REGISTER TOKEN TO CLOUDFLARE
+    ================================= */
+
+    async function sendTokenToWorker(token) {
+
+      const response = await fetch(
+        REGISTER_ENDPOINT,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json"
+          },
+
+          body: JSON.stringify({
+            token: token
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+
+        throw new Error(
+          "Token registration failed: " +
+          response.status + " " + errorText
+        );
+      }
+
+      return await response.json().catch(function () {
+        return { success: true };
+      });
+    }
+
+
+    /* =================================
+       ENABLE PUSH NOTIFICATIONS
+    ================================= */
+
+    let notificationBusy = false;
+
+    notificationButton.addEventListener(
+      "click",
+      async function () {
+
+        if (notificationBusy) return;
+
+        notificationBusy = true;
+
+        notificationButton.disabled = true;
+
+        try {
+
+          if (!("Notification" in window)) {
+            throw new Error(
+              "Browser hii haitumii notifications."
+            );
+          }
+
+          if (!("serviceWorker" in navigator)) {
+            throw new Error(
+              "Service Worker haipatikani."
+            );
+          }
+
+          if (!navigator.onLine) {
+            throw new Error(
+              "Washa internet kisha jaribu tena."
+            );
+          }
+
+          if (Notification.permission === "denied") {
+            throw new Error(
+              "Notifications zimezuiwa. Ruhusu kupitia mipangilio ya browser."
+            );
+          }
+
+          const permission =
+            await Notification.requestPermission();
+
+          if (permission !== "granted") {
+            throw new Error(
+              "Hujaruhusu notifications."
+            );
+          }
+
+          await registerServiceWorker();
+
+          await initializeFirebase();
+
+          const token = await messaging.getToken({
+            vapidKey: VAPID_PUBLIC_KEY,
+            serviceWorkerRegistration: swRegistration
+          });
+
+          if (!token) {
+            throw new Error(
+              "Firebase haijatoa FCM token."
+            );
+          }
+
+          const result =
+            await sendTokenToWorker(token);
+
+          console.log(
+            "FCM registration result:",
+            result
+          );
+
+          showToast(
+            "Notifications zimewashwa kikamilifu!"
+          );
+
+          notificationButton.textContent =
+            "✓ NOTIFICATIONS ZIMEWASHWA";
+
+        } catch (error) {
+
+          console.error(
+            "FCM ERROR:",
+            error
+          );
+
+          showToast(
+            error.message || "Imeshindikana kuwasha notifications."
+          );
+
+        } finally {
+
+          notificationBusy = false;
+
+          notificationButton.disabled = false;
 
         }
 
@@ -366,61 +630,35 @@
     );
 
 
-    /* APP INSTALLED */
-    window.addEventListener(
-      "appinstalled",
-      function () {
+    /* =================================
+       INITIALIZE SERVICE WORKER
+    ================================= */
 
-        openBlogger();
+    window.addEventListener("load", async function () {
 
-        deferredInstallPrompt = null;
+      try {
 
-        showToast("Story Za Dully Installed!");
+        await registerServiceWorker();
+
+        console.log(
+          "Story Za Dully Service Worker Ready"
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Service Worker Error:",
+          error
+        );
 
       }
-    );
+
+    });
 
 
-    /* CONTINUE WITHOUT INSTALLING */
-    continueButton.addEventListener(
-      "click",
-      function () {
-
-        openBlogger();
-
-      }
-    );
-
-
-    /* INITIAL CHECK */
-    checkInstalled();
-
-
-    /* TOAST MESSAGE */
-    const toast = document.getElementById("toast");
-
-    let toastTimer;
-
-    function showToast(message) {
-
-      toast.textContent = message;
-
-      toast.classList.add("show");
-
-      clearTimeout(toastTimer);
-
-      toastTimer = setTimeout(function () {
-
-        toast.classList.remove("show");
-
-      }, 2500);
-
-    }
-
-
-    /* INTERNET STATUS */
-    const networkStatus =
-      document.getElementById("networkStatus");
+    /* =================================
+       INTERNET STATUS
+    ================================= */
 
     function checkInternet() {
 
@@ -430,23 +668,21 @@
     }
 
     window.addEventListener("offline", function () {
-
       networkStatus.style.display = "block";
-
     });
 
     window.addEventListener("online", function () {
-
       networkStatus.style.display = "none";
-
       showToast("Internet Connection Restored");
-
     });
 
     checkInternet();
 
 
-    /* BACK BUTTON */
+    /* =================================
+       BACK BUTTON
+    ================================= */
+
     let lastBackPress = 0;
 
     history.pushState(
@@ -462,7 +698,6 @@
       if (now - lastBackPress < 2000) {
 
         lastBackPress = 0;
-
         history.back();
 
       } else {
