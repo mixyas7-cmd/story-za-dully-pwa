@@ -480,6 +480,17 @@
     const blog = document.getElementById("blog");
     const BLOG_URL = "https://dullystory.blogspot.com/";
 
+    /* KUMBUKA UKURASA WA BLOG ULIOPO */
+    let currentBlogUrl = BLOG_URL;
+
+    window.addEventListener("message", function (e) {
+      if (!/^https:\/\/dullystory\.blogspot\.[a-z.]+$/.test(e.origin)) return;
+      const u = e.data && e.data.dullyUrl;
+      if (typeof u === "string" && u.indexOf(e.origin + "/") === 0) {
+        currentBlogUrl = u;
+      }
+    });
+
     const splashStart = Date.now();
     const SPLASH_MIN = 1800;
     const SPLASH_MAX = 7000;
@@ -743,7 +754,7 @@
       if (dy <= 0) return;
 
       pullDistance = Math.min(dy * 0.6, 120);
-      setIndicator(pullDistance + 10, Math.min(pullDistance / 60, 1));
+      setIndicator(pullDistance + 30, Math.min(pullDistance / 60, 1));
     }, { passive: true });
 
     function endPull() {
@@ -753,9 +764,9 @@
       if (pullDistance >= PULL_TRIGGER * 0.6 && !refreshing) {
         refreshing = true;
         pullIndicator.classList.add("animate", "loading");
-        setIndicator(80, 1);
+        setIndicator(105, 1);
 
-        blog.src = BLOG_URL;
+        blog.src = currentBlogUrl;
 
         /* Ficha kiashiria blog ikipakia, au baada ya sekunde 8 */
         const done = function () {
