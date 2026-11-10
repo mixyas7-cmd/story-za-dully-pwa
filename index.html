@@ -109,7 +109,7 @@
       top: 0;
       left: 0;
       right: 0;
-      height: 26px;
+      height: 48px;
       z-index: 8000;
       touch-action: none;
     }
@@ -517,10 +517,20 @@
 
     /* SCREEN ON (WAKE LOCK) */
     let wakeLock = null;
+    let wakeToastShown = false;
 
     async function keepAwake() {
+      if (!("wakeLock" in navigator)) {
+        if (!wakeToastShown) {
+          wakeToastShown = true;
+          setTimeout(function () {
+            showToast("Screen on haiungwi mkono hapa");
+          }, 3000);
+        }
+        return;
+      }
       try {
-        if ("wakeLock" in navigator && !wakeLock) {
+        if (!wakeLock) {
           wakeLock = await navigator.wakeLock.request("screen");
           wakeLock.addEventListener("release", function () {
             wakeLock = null;
@@ -528,6 +538,12 @@
         }
       } catch (e) {
         wakeLock = null;
+        if (!wakeToastShown) {
+          wakeToastShown = true;
+          setTimeout(function () {
+            showToast("Screen on imekataliwa: " + e.name);
+          }, 3000);
+        }
       }
     }
 
