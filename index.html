@@ -743,7 +743,7 @@
       if (dy <= 0) return;
 
       pullDistance = Math.min(dy * 0.6, 120);
-      setIndicator(pullDistance - 40, Math.min(pullDistance / 60, 1));
+      setIndicator(pullDistance + 10, Math.min(pullDistance / 60, 1));
     }, { passive: true });
 
     function endPull() {
@@ -753,7 +753,7 @@
       if (pullDistance >= PULL_TRIGGER * 0.6 && !refreshing) {
         refreshing = true;
         pullIndicator.classList.add("animate", "loading");
-        setIndicator(30, 1);
+        setIndicator(80, 1);
 
         blog.src = BLOG_URL;
 
