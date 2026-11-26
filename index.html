@@ -103,6 +103,69 @@
       background: #050816;
     }
 
+    /* CHOICE POPUP */
+    #choicePopup {
+      position: fixed;
+      inset: 0;
+      z-index: 15000;
+      background: rgba(5,8,22,0.97);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 25px;
+    }
+
+    #choiceBox {
+      width: 100%;
+      max-width: 340px;
+      text-align: center;
+    }
+
+    #choiceLogo {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.25);
+      margin-bottom: 22px;
+    }
+
+    #choiceTitle {
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: bold;
+      line-height: 1.4;
+      margin: 0 0 12px;
+    }
+
+    #choiceText {
+      color: #b8bdca;
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 0 0 28px;
+    }
+
+    #choiceButtons {
+      display: flex;
+      gap: 10px;
+    }
+
+    #choiceButtons button {
+      flex: 1;
+      padding: 16px 8px;
+      border: none;
+      border-radius: 10px;
+      background: #ffffff;
+      color: #050816;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #choiceButtons button:active {
+      transform: scale(0.97);
+    }
+
     /* PULL TO REFRESH */
     #pullZone {
       position: fixed;
@@ -439,12 +502,28 @@
     </div>
   </div>
 
-  <!-- BLOGGER -->
+  <!-- BLOGGER (src inawekwa na script baada ya uchaguzi) -->
   <iframe
     id="blog"
-    src="https://dullystory.blogspot.com/"
     title="Story Za Dully">
   </iframe>
+
+  <!-- CHOICE POPUP -->
+  <div id="choicePopup">
+    <div id="choiceBox">
+      <img
+        id="choiceLogo"
+        src="./icons/icon-512.png"
+        alt="Story Za Dully"
+      >
+      <h3 id="choiceTitle"></h3>
+      <p id="choiceText"></p>
+      <div id="choiceButtons">
+        <button id="choiceImage">Za Picha</button>
+        <button id="choiceText2">Za Maandishi</button>
+      </div>
+    </div>
+  </div>
 
   <!-- PULL TO REFRESH -->
   <div id="pullZone"></div>
@@ -475,21 +554,31 @@
 
   <script>
 
+    /* FIREBASE */
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
+      authDomain: "mfano-c0401.firebaseapp.com",
+      projectId: "mfano-c0401",
+      storageBucket: "mfano-c0401.firebasestorage.app",
+      messagingSenderId: "322823059663",
+      appId: "1:322823059663:web:cc885bd9c5631987309fba"
+    };
+
+    const VAPID_KEY =
+      "BFEdvTtcVdO21MC7oTMnhBzgSeUfvIw5RSoLGP4gFIg_oDac4eyt3u353wCt7YEI_Vz74CXMW-y072a8-qhmREQ";
+
+    const FB = "https://www.gstatic.com/firebasejs/10.14.1/";
+
+    function getFbApp(appMod) {
+      return appMod.getApps().length
+        ? appMod.getApp()
+        : appMod.initializeApp(firebaseConfig);
+    }
+
+
     /* SPLASH SCREEN */
     const splash = document.getElementById("splash");
     const blog = document.getElementById("blog");
-    const BLOG_URL = "https://dullystory.blogspot.com/";
-
-    /* KUMBUKA UKURASA WA BLOG ULIOPO */
-    let currentBlogUrl = BLOG_URL;
-
-    window.addEventListener("message", function (e) {
-      if (!/^https:\/\/dullystory\.blogspot\.[a-z.]+$/.test(e.origin)) return;
-      const u = e.data && e.data.dullyUrl;
-      if (typeof u === "string" && u.indexOf(e.origin + "/") === 0) {
-        currentBlogUrl = u;
-      }
-    });
 
     const splashStart = Date.now();
     const SPLASH_MIN = 1800;
@@ -510,8 +599,160 @@
       }, wait);
     }
 
-    blog.addEventListener("load", hideSplash);
     setTimeout(hideSplash, SPLASH_MAX);
+
+
+    /* UCHAGUZI WA BLOG (PICHA / MAANDISHI) */
+    const BLOGS = {
+      image: "https://dullystoryapp.blogspot.com/",
+      text: "https://dullystory.blogspot.com/"
+    };
+
+    const CHOICE_KEY = "dullyChoice";
+    const SETTINGS_KEY = "dullySettings";
+
+    const DEFAULT_SETTINGS = {
+      title: "Wewe ni mpenzi wa simulizi gani?",
+      text: "Kumbuka: baada ya kufanya uchaguzi hautaweza kuchagua tena mpaka muda upite.",
+      lockMinutes: 1440
+    };
+
+    const choicePopup = document.getElementById("choicePopup");
+
+    let chosenType = null;
+    let currentBlogUrl = "";
+    let appStarted = false;
+
+    function readCachedSettings() {
+      try {
+        const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
+        if (s && s.title && s.text && s.lockMinutes > 0) return s;
+      } catch (e) {}
+      return null;
+    }
+
+    function cacheSettings(s) {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      } catch (e) {}
+    }
+
+    async function fetchSettings() {
+      const appMod = await import(FB + "firebase-app.js");
+      const dbMod = await import(FB + "firebase-firestore.js");
+
+      const app = getFbApp(appMod);
+      const db = dbMod.getFirestore(app);
+
+      const snap = await dbMod.getDoc(dbMod.doc(db, "settings", "popup"));
+      if (!snap.exists()) return null;
+
+      const d = snap.data();
+      const lock = parseInt(d.lockMinutes, 10);
+
+      return {
+        title: d.title || DEFAULT_SETTINGS.title,
+        text: d.text || DEFAULT_SETTINGS.text,
+        lockMinutes: lock > 0 ? lock : DEFAULT_SETTINGS.lockMinutes
+      };
+    }
+
+    async function loadSettings() {
+      const fresh = fetchSettings()
+        .then(function (s) {
+          if (s) cacheSettings(s);
+          return s;
+        })
+        .catch(function () {
+          return null;
+        });
+
+      const timeout = new Promise(function (resolve) {
+        setTimeout(function () { resolve(null); }, 2500);
+      });
+
+      const got = await Promise.race([fresh, timeout]);
+      return got || readCachedSettings() || DEFAULT_SETTINGS;
+    }
+
+    function readChoice() {
+      try {
+        const c = JSON.parse(localStorage.getItem(CHOICE_KEY) || "null");
+        if (c && BLOGS[c.type] && typeof c.at === "number") return c;
+      } catch (e) {}
+      return null;
+    }
+
+    function choiceStillLocked(choice, lockMinutes) {
+      if (!choice) return false;
+      const now = Date.now();
+      /* Saa ya simu ikirudishwa nyuma, chaguo linahesabiwa limeisha */
+      if (choice.at > now) return false;
+      return (now - choice.at) < lockMinutes * 60 * 1000;
+    }
+
+    function loadBlog(type) {
+      chosenType = type;
+      currentBlogUrl = BLOGS[type];
+      blog.addEventListener("load", hideSplash, { once: true });
+      blog.src = currentBlogUrl;
+    }
+
+    function showChoicePopup(settings) {
+      document.getElementById("choiceTitle").textContent = settings.title;
+      document.getElementById("choiceText").textContent = settings.text;
+      choicePopup.style.display = "flex";
+      hideSplash();
+    }
+
+    function choose(type) {
+      try {
+        localStorage.setItem(
+          CHOICE_KEY,
+          JSON.stringify({ type: type, at: Date.now() })
+        );
+      } catch (e) {}
+
+      choicePopup.style.display = "none";
+      loadBlog(type);
+      setTimeout(maybeShowPrompt, 3000);
+    }
+
+    document.getElementById("choiceImage")
+      .addEventListener("click", function () { choose("image"); });
+
+    document.getElementById("choiceText2")
+      .addEventListener("click", function () { choose("text"); });
+
+    async function startApp() {
+      if (appStarted) return;
+      appStarted = true;
+
+      const settings = await loadSettings();
+      const choice = readChoice();
+
+      if (choiceStillLocked(choice, settings.lockMinutes)) {
+        loadBlog(choice.type);
+        setTimeout(maybeShowPrompt, 3000);
+      } else {
+        showChoicePopup(settings);
+      }
+    }
+
+    /* KUMBUKA UKURASA WA BLOG ULIOPO */
+    function allowedOrigin(origin) {
+      if (!chosenType) return false;
+      const host = new URL(BLOGS[chosenType]).hostname.split(".blogspot.")[0];
+      return new RegExp("^https://" + host + "\\.blogspot\\.[a-z.]+$").test(origin);
+    }
+
+    window.addEventListener("message", function (e) {
+      if (!allowedOrigin(e.origin)) return;
+      const u = e.data && e.data.dullyUrl;
+      if (typeof u === "string" && u.indexOf(e.origin + "/") === 0) {
+        currentBlogUrl = u;
+      }
+    });
 
 
     /* SERVICE WORKER */
@@ -588,7 +829,7 @@
     /* HIDE INSTALL PAGE */
     function openBlogger() {
       installPage.style.display = "none";
-      setTimeout(maybeShowPrompt, 1200);
+      startApp();
     }
 
 
@@ -692,7 +933,10 @@
 
 
     /* INITIAL CHECK */
-    checkInstalled();
+    if (!checkInstalled()) {
+      /* Ukurasa wa INSTALL unaonekana, splash iondoke */
+      hideSplash();
+    }
 
 
     /* TOAST MESSAGE */
@@ -740,7 +984,7 @@
     }
 
     pullZone.addEventListener("touchstart", function (e) {
-      if (refreshing) return;
+      if (refreshing || !chosenType) return;
       pulling = true;
       pullDistance = 0;
       pullStartY = e.touches[0].clientY;
@@ -850,27 +1094,13 @@
     });
 
 
-    /* FIREBASE */
-    const firebaseConfig = {
-      apiKey: "AIzaSyA2RSvI4qpxFRY0B65ZI4HtlGFcKH6XIgI",
-      authDomain: "mfano-c0401.firebaseapp.com",
-      projectId: "mfano-c0401",
-      storageBucket: "mfano-c0401.firebasestorage.app",
-      messagingSenderId: "322823059663",
-      appId: "1:322823059663:web:cc885bd9c5631987309fba"
-    };
-
-    const VAPID_KEY =
-      "BFEdvTtcVdO21MC7oTMnhBzgSeUfvIw5RSoLGP4gFIg_oDac4eyt3u353wCt7YEI_Vz74CXMW-y072a8-qhmREQ";
-
-    const FB = "https://www.gstatic.com/firebasejs/10.14.1/";
-
+    /* TOKEN YA NOTIFICATION */
     async function saveToken() {
       const appMod = await import(FB + "firebase-app.js");
       const msgMod = await import(FB + "firebase-messaging.js");
       const dbMod = await import(FB + "firebase-firestore.js");
 
-      const app = appMod.initializeApp(firebaseConfig);
+      const app = getFbApp(appMod);
       const messaging = msgMod.getMessaging(app);
       const reg = await navigator.serviceWorker.ready;
 
@@ -918,6 +1148,8 @@
       if (Notification.permission !== "default") return;
       if (wasDeniedRecently()) return;
       if (installPage.style.display !== "none") return;
+      if (!chosenType) return;
+      if (choicePopup.style.display === "flex") return;
 
       document.getElementById("notifyPrompt").style.display = "flex";
     }
