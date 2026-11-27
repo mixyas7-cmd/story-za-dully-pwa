@@ -103,6 +103,95 @@
       background: #050816;
     }
 
+    /* LINK BROWSER */
+    #linkBrowser {
+      position: fixed;
+      inset: 0;
+      z-index: 16000;
+      background: #050816;
+      display: none;
+      flex-direction: column;
+    }
+
+    #lbBar {
+      height: 54px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px;
+      background: #0d1226;
+      border-bottom: 1px solid #222a44;
+    }
+
+    #lbClose {
+      width: 42px;
+      height: 42px;
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 24px;
+      cursor: pointer;
+    }
+
+    #lbHost {
+      flex: 1;
+      min-width: 0;
+      color: #ffffff;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #lbOpen {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #3a4160;
+      background: transparent;
+      color: #d5d8e0;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #lbFrame {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #ffffff;
+    }
+
+    #lbPill {
+      position: absolute;
+      bottom: 35px;
+      left: 50%;
+      transform: translate(-50%, 20px);
+      background: #292929;
+      color: #ffffff;
+      padding: 13px 22px;
+      border-radius: 25px;
+      font-size: 14px;
+      font-weight: bold;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease, background .25s ease;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    #lbPill.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
+
+    #lbPill.done {
+      background: #1b8a3a;
+    }
+
     /* CHOICE POPUP */
     #choicePopup {
       position: fixed;
@@ -508,6 +597,17 @@
     title="Story Za Dully">
   </iframe>
 
+  <!-- LINK BROWSER -->
+  <div id="linkBrowser">
+    <div id="lbBar">
+      <button id="lbClose" aria-label="Funga">✕</button>
+      <div id="lbHost"></div>
+      <button id="lbOpen">Chrome ↗</button>
+    </div>
+    <iframe id="lbFrame" title="Link"></iframe>
+    <div id="lbPill"></div>
+  </div>
+
   <!-- CHOICE POPUP -->
   <div id="choicePopup">
     <div id="choiceBox">
@@ -691,11 +791,24 @@
       return (now - choice.at) < lockMinutes * 60 * 1000;
     }
 
+    /* Iambie blog kwamba app iko tayari kupokea link za nje.
+       Kivinjari cha ndani kikizimwa, hatutumi ujumbe huu, kwa hiyo
+       blog haizuii link na zinafunguka kwenye Chrome kama kawaida. */
+    function announceReady() {
+      if (!linkSettings.browserEnabled) return;
+      try {
+        blog.contentWindow.postMessage({ dullyReady: true }, "*");
+      } catch (e) {}
+    }
+
+    blog.addEventListener("load", announceReady);
+
     function loadBlog(type) {
       chosenType = type;
       currentBlogUrl = BLOGS[type];
       blog.addEventListener("load", hideSplash, { once: true });
       blog.src = currentBlogUrl;
+      syncToken();
     }
 
     function showChoicePopup(settings) {
@@ -739,7 +852,7 @@
       }
     }
 
-    /* KUMBUKA UKURASA WA BLOG ULIOPO */
+    /* KUMBUKA UKURASA WA BLOG ULIOPO NA KUPOKEA LINK ZA NJE */
     function allowedOrigin(origin) {
       if (!chosenType) return false;
       const host = new URL(BLOGS[chosenType]).hostname.split(".blogspot.")[0];
@@ -747,12 +860,195 @@
     }
 
     window.addEventListener("message", function (e) {
+      if (e.source !== blog.contentWindow) return;
       if (!allowedOrigin(e.origin)) return;
-      const u = e.data && e.data.dullyUrl;
-      if (typeof u === "string" && u.indexOf(e.origin + "/") === 0) {
-        currentBlogUrl = u;
+
+      const d = e.data || {};
+
+      if (typeof d.dullyUrl === "string" &&
+          d.dullyUrl.indexOf(e.origin + "/") === 0) {
+        currentBlogUrl = d.dullyUrl;
+      }
+
+      if (typeof d.dullyLink === "string") {
+        if (linkSettings.browserEnabled) {
+          openLink(d.dullyLink);
+        } else {
+          /* Kivinjari cha ndani kimezimwa: fungua kwenye Chrome */
+          try {
+            window.open(d.dullyLink, "_blank", "noopener");
+          } catch (err) {}
+        }
       }
     });
+
+
+    /* MIPANGILIO YA LINK (KIVINJARI + COUNTDOWN) */
+    const LINKS_KEY = "dullyLinkSettings";
+
+    const DEFAULT_LINKS = {
+      browserEnabled: true,
+      enabled: true,
+      seconds: 7,
+      waitText: "Subiri",
+      doneText: "Thank you for support"
+    };
+
+    function readCachedLinks() {
+      try {
+        const s = JSON.parse(localStorage.getItem(LINKS_KEY) || "null");
+        if (s && s.seconds > 0 && s.waitText && s.doneText) {
+          return {
+            browserEnabled: s.browserEnabled !== false,
+            enabled: s.enabled !== false,
+            seconds: s.seconds,
+            waitText: s.waitText,
+            doneText: s.doneText
+          };
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    let linkSettings = readCachedLinks() || DEFAULT_LINKS;
+
+    async function fetchLinkSettings() {
+      const appMod = await import(FB + "firebase-app.js");
+      const dbMod = await import(FB + "firebase-firestore.js");
+
+      const app = getFbApp(appMod);
+      const db = dbMod.getFirestore(app);
+
+      const snap = await dbMod.getDoc(dbMod.doc(db, "settings", "links"));
+      if (!snap.exists()) return null;
+
+      const d = snap.data();
+      const secs = parseInt(d.seconds, 10);
+
+      return {
+        browserEnabled: d.browserEnabled !== false,
+        enabled: d.enabled !== false,
+        seconds: secs > 0 ? secs : DEFAULT_LINKS.seconds,
+        waitText: d.waitText || DEFAULT_LINKS.waitText,
+        doneText: d.doneText || DEFAULT_LINKS.doneText
+      };
+    }
+
+    function refreshLinkSettings() {
+      fetchLinkSettings()
+        .then(function (s) {
+          if (!s) return;
+          linkSettings = s;
+          try {
+            localStorage.setItem(LINKS_KEY, JSON.stringify(s));
+          } catch (e) {}
+          /* Kama blog ilishapakia kabla mipangilio haijafika */
+          announceReady();
+        })
+        .catch(function () {});
+    }
+
+    refreshLinkSettings();
+
+    const linkBrowser = document.getElementById("linkBrowser");
+    const lbFrame = document.getElementById("lbFrame");
+    const lbHost = document.getElementById("lbHost");
+    const lbPill = document.getElementById("lbPill");
+
+    let browserOpen = false;
+    let lbArmed = false;
+    let lbStarted = false;
+    let lbInterval = null;
+    let lbFallback = null;
+    let lbHideTimer = null;
+    let currentLinkUrl = "";
+
+    function showPill(done, text) {
+      lbPill.textContent = text;
+      lbPill.classList.toggle("done", done);
+      lbPill.classList.add("show");
+    }
+
+    function hidePill() {
+      lbPill.classList.remove("show");
+    }
+
+    function startCountdown() {
+      if (lbStarted) return;
+      lbStarted = true;
+      clearTimeout(lbFallback);
+
+      if (!linkSettings.enabled) return;
+
+      let left = linkSettings.seconds;
+      showPill(false, linkSettings.waitText + " " + left);
+
+      lbInterval = setInterval(function () {
+        left--;
+
+        if (left > 0) {
+          showPill(false, linkSettings.waitText + " " + left);
+          return;
+        }
+
+        clearInterval(lbInterval);
+        showPill(true, "✓ " + linkSettings.doneText);
+        lbHideTimer = setTimeout(hidePill, 2500);
+      }, 1000);
+    }
+
+    lbFrame.addEventListener("load", function () {
+      if (lbArmed) startCountdown();
+    });
+
+    function openLink(url) {
+      let u;
+      try {
+        u = new URL(url);
+      } catch (e) {
+        return;
+      }
+      if (u.protocol !== "http:" && u.protocol !== "https:") return;
+
+      closeLink();
+
+      currentLinkUrl = u.href;
+      lbHost.textContent = u.hostname;
+      browserOpen = true;
+      lbArmed = true;
+      lbStarted = false;
+
+      linkBrowser.style.display = "flex";
+      lbFrame.src = u.href;
+
+      /* Kama ukurasa haupakii, anza countdown hata hivyo */
+      lbFallback = setTimeout(startCountdown, 6000);
+    }
+
+    function closeLink() {
+      clearInterval(lbInterval);
+      clearTimeout(lbFallback);
+      clearTimeout(lbHideTimer);
+      hidePill();
+
+      lbArmed = false;
+      browserOpen = false;
+      linkBrowser.style.display = "none";
+
+      if (lbFrame.src && lbFrame.src !== "about:blank") {
+        lbFrame.src = "about:blank";
+      }
+    }
+
+    document.getElementById("lbClose")
+      .addEventListener("click", closeLink);
+
+    document.getElementById("lbOpen")
+      .addEventListener("click", function () {
+        if (currentLinkUrl) {
+          window.open(currentLinkUrl, "_blank", "noopener");
+        }
+      });
 
 
     /* SERVICE WORKER */
@@ -1069,6 +1365,19 @@
 
     window.addEventListener("popstate", function () {
 
+      /* Kivinjari cha link kikiwa wazi, back kinakifunga */
+      if (browserOpen) {
+        closeLink();
+
+        history.pushState(
+          { exitGuard: true },
+          "",
+          location.href
+        );
+
+        return;
+      }
+
       const now = Date.now();
 
       if (now - lastBackPress < 2000) {
@@ -1094,7 +1403,7 @@
     });
 
 
-    /* TOKEN YA NOTIFICATION */
+    /* TOKEN YA NOTIFICATION (pamoja na kundi la msomaji) */
     async function saveToken() {
       const appMod = await import(FB + "firebase-app.js");
       const msgMod = await import(FB + "firebase-messaging.js");
@@ -1115,13 +1424,27 @@
 
       const db = dbMod.getFirestore(app);
 
-      await dbMod.setDoc(
-        dbMod.doc(db, "tokens", token),
-        {
-          token: token,
-          createdAt: dbMod.serverTimestamp()
-        }
-      );
+      const data = {
+        token: token,
+        createdAt: dbMod.serverTimestamp()
+      };
+
+      if (chosenType === "image" || chosenType === "text") {
+        data.group = chosenType;
+      }
+
+      await dbMod.setDoc(dbMod.doc(db, "tokens", token), data);
+    }
+
+    /* Ruhusa ikishatolewa na kundi likijulikana, hifadhi kimya kimya */
+    function syncToken() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
+      if (!chosenType) return;
+
+      saveToken().catch(function (e) {
+        console.error(e);
+      });
     }
 
 
@@ -1187,14 +1510,6 @@
         hidePrompt();
 
       });
-
-    /* Ruhusa ikishatolewa, hifadhi token kimya kimya */
-    if ("Notification" in window &&
-        Notification.permission === "granted") {
-      saveToken().catch(function (e) {
-        console.error(e);
-      });
-    }
 
   </script>
 
